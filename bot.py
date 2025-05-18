@@ -1,30 +1,31 @@
-
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
+from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
-ADMIN_CHAT_ID = 123456789  # شناسه عددی مدیر
+ADMIN_CHAT_ID = 123456789  # شناسه عددی مدیر (جایگزین کن)
+
 BOT_TOKEN = "866070292:AAHXfqObC98ajBHnDRdfqs24haU6crDxlv8"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    button = KeyboardButton("حاضر", request_location=True)
-    keyboard = ReplyKeyboardMarkup([[button]], resize_keyboard=True)
-    await update.message.reply_text(
-        "لطفاً برای ثبت حضور، لوکیشن زنده خود را به صورت دستی ارسال کنید.",
-        reply_markup=keyboard
-    )
+    await update.message.reply_text("سلام! لطفاً موقعیت مکانی خود را به‌صورت دستی ارسال کنید تا حضور شما ثبت شود.")
 
-async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     location = update.message.location
 
+    # ارسال پیام به مدیر
     await context.bot.send_message(
         chat_id=ADMIN_CHAT_ID,
-        text=f"{user.full_name} لوکیشن خود را ارسال کرده است:\nhttps://maps.google.com/?q={location.latitude},{location.longitude}"
+        text=f"{user.full_name} لوکیشن خود را ارسال کرد:\nhttps://maps.google.com/?q={location.latitude},{location.longitude}"
     )
-    await update.message.reply_text("حضور شما ثبت شد. ممنون!")
+
+    await update.message.reply_text("ممنون! حضور شما ثبت شد.")
 
 if __name__ == "__main__":
     app = ApplicationBuilder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))  # برای /start در گروه و خصوصی
-    app.add_handler(MessageHandler(filters.LOCATION, location_handler))
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.LOCATION, handle_location))
+
     app.run_polling()
+
+    
