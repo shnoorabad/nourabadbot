@@ -6,7 +6,7 @@ ADMIN_CHAT_ID = 123902504  # شناسه عددی مدیر
 BOT_TOKEN = "866070292:AAHXfqObC98ajBHnDRdfqs24haU6crDxlv8"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    button = KeyboardButton("حاضر", request_location=True)
+    button = KeyboardButton("ورود/خروج", request_location=True)
     keyboard = ReplyKeyboardMarkup([[button]], resize_keyboard=True)
     await update.message.reply_text(
         "لطفاً برای ثبت حضور، لوکیشن زنده خود را به صورت دستی ارسال کنید.",
