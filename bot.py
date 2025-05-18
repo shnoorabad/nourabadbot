@@ -21,7 +21,7 @@ async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id=ADMIN_CHAT_ID,
         text=f"{user.full_name} لوکیشن خود را ارسال کرده است:\nhttps://maps.google.com/?q={location.latitude},{location.longitude}"
     )
-    await update.message.reply_text("حضور شما ثبت شد. ممنون!")
+    await update.message.reply_text("  ثبت شد. ممنون !")
 
 if __name__ == "__main__":
     app = ApplicationBuilder().token(BOT_TOKEN).build()
