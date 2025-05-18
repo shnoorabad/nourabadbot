@@ -3,7 +3,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, Con
 
 ADMIN_CHAT_ID = 123456789  # شناسه عددی مدیر
 
-BOT_TOKEN = "توکن_ربات_شما"
+BOT_TOKEN = "866070292:AAHXfqObC98ajBHnDRdfqs24haU6crDxlv8"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     button = KeyboardButton("حاضر", request_location=True)
