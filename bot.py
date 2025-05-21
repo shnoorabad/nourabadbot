@@ -1,6 +1,6 @@
 
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters, ConversationHandler
 import sqlite3
 from datetime import datetime
 import os
@@ -9,6 +9,8 @@ from openpyxl import Workbook
 from reportlab.pdfgen import canvas
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase import pdfmetrics
+from bidi.algorithm import get_display
+import arabic_reshaper
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
@@ -20,6 +22,9 @@ FONT_PATH = "./fonts/Vazir.ttf"
 PDF_REPORT = "attendance_report.pdf"
 EXCEL_REPORT = "attendance_report.xlsx"
 SERVICE_ACCOUNT_FILE = "/etc/secrets/credentials.json"
+
+ASK_START, ASK_END = range(2)
+admin_report_requests = {}
 
 def init_db():
     conn = sqlite3.connect(DB_FILE)
@@ -62,63 +67,78 @@ def upload_to_drive():
     media = MediaFileUpload(DB_FILE, mimetype="application/octet-stream")
     service.files().create(body=file_metadata, media_body=media, fields="id").execute()
 
-def generate_reports():
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute("SELECT user_id, full_name, action, timestamp FROM attendance ORDER BY timestamp")
-    records = cursor.fetchall()
-    conn.close()
+def reshape(text):
+    return get_display(arabic_reshaper.reshape(text))
 
-    data = defaultdict(lambda: defaultdict(list))
-    for uid, name, action, ts in records:
-        date_str = ts[:10]
-        data[(uid, name)][date_str].append((action, ts))
-
+def create_pdf_report(records, start_date, end_date):
     pdfmetrics.registerFont(TTFont("Vazir", FONT_PATH))
     c = canvas.Canvas(PDF_REPORT)
-    c.setFont("Vazir", 12)
-    y = 800
-    c.drawString(100, y, "گزارش روزانه حضور کاربران")
-    y -= 30
+    c.setFont("Vazir", 14)
+    c.drawRightString(550, 800, reshape(f"گزارش حضور از {start_date} تا {end_date}"))
 
+    y = 770
+    for row in records:
+        full_name, action, lat, lon, timestamp = row
+        t = datetime.fromisoformat(timestamp)
+        line = f"{full_name} | {action} | {t.strftime('%Y-%m-%d %H:%M')} | مختصات: {lat:.5f}, {lon:.5f}"
+        c.drawRightString(550, y, reshape(line))
+        y -= 20
+        if y < 50:
+            c.showPage()
+            y = 800
+    c.save()
+
+def create_excel_report(records):
     wb = Workbook()
     ws = wb.active
     ws.title = "Attendance"
-    ws.append(["نام", "تاریخ", "مدت (ساعت)"])
-
-    for (uid, name), days in data.items():
-        for day, actions in days.items():
-            ins = [datetime.fromisoformat(t) for a, t in actions if a == "ورود"]
-            outs = [datetime.fromisoformat(t) for a, t in actions if a == "خروج"]
-            ins.sort()
-            outs.sort()
-            total = sum((outs[i] - ins[i]).total_seconds() for i in range(min(len(ins), len(outs))))
-            hours = round(total / 3600, 2)
-            line = f"{name} - {day} : {hours} ساعت"
-            c.drawString(100, y, line)
-            y -= 20
-            ws.append([name, day, hours])
-            if y < 50:
-                c.showPage()
-                y = 800
-
-    c.save()
+    ws.append(["نام", "عملیات", "تاریخ‌وساعت", "عرض جغرافیایی", "طول جغرافیایی"])
+    for row in records:
+        ws.append(row)
     wb.save(EXCEL_REPORT)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     is_admin = update.effective_user.id == ADMIN_CHAT_ID
-    buttons = [[KeyboardButton("ثبت حضور", request_location=True)]]
+    keyboard = [[KeyboardButton("ثبت حضور", request_location=True)]]
     if is_admin:
-        buttons.append([KeyboardButton("گزارش‌گیری")])
-    reply_markup = ReplyKeyboardMarkup(buttons, resize_keyboard=True)
-    await update.message.reply_text("یکی از گزینه‌ها را انتخاب کنید:", reply_markup=reply_markup)
+        keyboard.append([KeyboardButton("گزارش‌گیری")])
+    await update.message.reply_text("یکی از گزینه‌ها را انتخاب کنید:", reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
 
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.text == "گزارش‌گیری" and update.effective_user.id == ADMIN_CHAT_ID:
-        generate_reports()
-        await update.message.reply_text("در حال ارسال گزارش‌ها...")
-        await context.bot.send_document(chat_id=ADMIN_CHAT_ID, document=open(PDF_REPORT, "rb"))
-        await context.bot.send_document(chat_id=ADMIN_CHAT_ID, document=open(EXCEL_REPORT, "rb"))
+        await update.message.reply_text("تاریخ شروع را وارد کنید (YYYY-MM-DD):")
+        return ASK_START
+    return ConversationHandler.END
+
+async def ask_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    admin_report_requests[user_id] = {"start": update.message.text}
+    await update.message.reply_text("تاریخ پایان را وارد کنید (YYYY-MM-DD):")
+    return ASK_END
+
+async def ask_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    admin_report_requests[user_id]["end"] = update.message.text
+    start = admin_report_requests[user_id]["start"]
+    end = admin_report_requests[user_id]["end"]
+
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT full_name, action, latitude, longitude, timestamp FROM attendance WHERE DATE(timestamp) BETWEEN ? AND ?", (start, end))
+    records = cursor.fetchall()
+    conn.close()
+
+    create_pdf_report(records, start, end)
+    create_excel_report(records)
+
+    await update.message.reply_text("گزارش آماده است:")
+    await context.bot.send_document(chat_id=user_id, document=open(PDF_REPORT, "rb"))
+    await context.bot.send_document(chat_id=user_id, document=open(EXCEL_REPORT, "rb"))
+    return ConversationHandler.END
+
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("گزارش‌گیری لغو شد.")
+    return ConversationHandler.END
 
 async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -135,8 +155,19 @@ async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 if __name__ == "__main__":
     if not os.path.exists(DB_FILE):
         init_db()
+
     app = ApplicationBuilder().token(BOT_TOKEN).build()
+
+    conv_handler = ConversationHandler(
+        entry_points=[MessageHandler(filters.TEXT & filters.Regex("گزارش‌گیری"), text_handler)],
+        states={
+            ASK_START: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_start)],
+            ASK_END: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_end)],
+        },
+        fallbacks=[CommandHandler("cancel", cancel)],
+    )
+
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), text_handler))
+    app.add_handler(conv_handler)
     app.add_handler(MessageHandler(filters.LOCATION, location_handler))
     app.run_polling()
