@@ -16,7 +16,7 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
 BOT_TOKEN = "866070292:AAG5jnr1idoHgZRWYLHTaKKb4ewy52lk9Pg"
-ADMIN_CHAT_ID 123902504
+ADMIN_CHAT_ID = 123902504
 DB_FILE = "attendance.db"
 FONT_PATH = "./fonts/Vazir.ttf"
 PDF_REPORT = "attendance_report.pdf"
