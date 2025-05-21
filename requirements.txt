@@ -2,3 +2,4 @@ python-telegram-bot==20.3
 reportlab
 arabic-reshaper
 python-bidi
+openpyxl
