@@ -11,11 +11,14 @@ import os
 import arabic_reshaper
 from bidi.algorithm import get_display
 from openpyxl import Workbook
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload
 
-ADMIN_CHAT_ID = 123902504
-BOT_TOKEN = "866070292:AAHXfqObC98ajBHnDRdfqs24haU6crDxlv8"
+ADMIN_CHAT_ID = 123902504  # شناسه عددی مدیر
+BOT_TOKEN = "866070292:AAESA0AZzrMvjEEPPJCw8iSUM9hDcRUvnvo"
 
-# ثبت فونت فارسی
+# فونت فارسی
 font_path = os.path.join(os.path.dirname(__file__), "fonts", "Vazir.ttf")
 pdfmetrics.registerFont(TTFont("Vazir", font_path))
 registerFontFamily("Vazir", normal="Vazir")
@@ -24,6 +27,7 @@ def reshape_text(text):
     reshaped = arabic_reshaper.reshape(text)
     return get_display(reshaped)
 
+# ساخت دیتابیس
 def init_db():
     conn = sqlite3.connect("attendance.db")
     cursor = conn.cursor()
@@ -41,17 +45,31 @@ def init_db():
 
 init_db()
 
+# آپلود در Google Drive
+def upload_to_drive():
+    SCOPES = ['https://www.googleapis.com/auth/drive.file']
+    SERVICE_ACCOUNT_FILE = '/etc/secrets/credentials.json'
+
+    creds = service_account.Credentials.from_service_account_file(
+        SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+
+    service = build('drive', 'v3', credentials=creds)
+
+    now = datetime.now().strftime("%Y-%m-%d_%H-%M")
+    file_metadata = {'name': f'attendance_{now}.db'}
+    media = MediaFileUpload('attendance.db', mimetype='application/octet-stream')
+    service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+
+# شروع ربات
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = ReplyKeyboardMarkup(
         [[KeyboardButton("ثبت ورود", request_location=True)],
          [KeyboardButton("ثبت خروج", request_location=True)]],
         resize_keyboard=True
     )
-    await update.message.reply_text(
-        "لطفاً یکی از گزینه‌ها را انتخاب و موقعیت مکانی خود را ارسال کنید.",
-        reply_markup=keyboard
-    )
+    await update.message.reply_text("لطفاً یکی از گزینه‌ها را انتخاب کنید و لوکیشن خود را ارسال نمایید.", reply_markup=keyboard)
 
+# ثبت حضور با لوکیشن
 async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     location = update.message.location
@@ -72,11 +90,16 @@ async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id=ADMIN_CHAT_ID,
         text=f"{user.full_name} ({action})\nموقعیت: https://maps.google.com/?q={location.latitude},{location.longitude}\nزمان: {timestamp}"
     )
-    await update.message.reply_text("ثبت شد. ممنون!")
 
+    await update.message.reply_text("ثبت شد. سپاسگزاریم!")
+
+    # آپلود خودکار دیتابیس در گوگل درایو
+    upload_to_drive()
+
+# تولید گزارش PDF و Excel
 async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_CHAT_ID:
-        await update.message.reply_text("شما مجاز نیستید.")
+        await update.message.reply_text("دسترسی ندارید.")
         return
 
     try:
@@ -84,7 +107,7 @@ async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
         start_date = datetime.fromisoformat(start_str)
         end_date = datetime.fromisoformat(end_str)
     except (IndexError, ValueError):
-        await update.message.reply_text("لطفاً دستور را به این صورت وارد کنید:\n/report YYYY-MM-DD YYYY-MM-DD")
+        await update.message.reply_text("لطفاً از فرمت درست استفاده کنید:\n/report YYYY-MM-DD YYYY-MM-DD")
         return
 
     conn = sqlite3.connect("attendance.db")
@@ -150,6 +173,7 @@ async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
         caption="گزارش اکسل حضور کاربران"
     )
 
+# اجرای ربات
 if __name__ == "__main__":
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
