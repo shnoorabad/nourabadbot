@@ -1,183 +1,179 @@
-
+import os
+import sqlite3
+import datetime
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
-import sqlite3
-from datetime import datetime
 from reportlab.pdfgen import canvas
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.pdfbase.pdfmetrics import registerFontFamily
-import os
-import arabic_reshaper
-from bidi.algorithm import get_display
-from openpyxl import Workbook
-from collections import defaultdict
+import pandas as pd
+
+# Google Drive imports
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
-ADMIN_CHAT_ID = 123902504  # شناسه عددی مدیر
-BOT_TOKEN = "866070292:AAESA0AZzrMvjEEPPJCw8iSUM9hDcRUvnvo"
+# اطلاعات ادمین
+ADMIN_CHAT_ID = 123902504  # عدد واقعی جایگزین شود
+BOT_TOKEN = "866070292:AAG5jnr1idoHgZRWYLHTaKKb4ewy52lk9Pg"
 
-# ثبت فونت فارسی برای PDF
-font_path = os.path.join(os.path.dirname(__file__), "fonts", "Vazir.ttf")
-pdfmetrics.registerFont(TTFont("Vazir", font_path))
-registerFontFamily("Vazir", normal="Vazir")
+# مسیر دیتابیس
+DB_FILE = "attendance.db"
+PDF_REPORT = "attendance_report.pdf"
+EXCEL_REPORT = "attendance_report.xlsx"
 
-def reshape(text):
-    return get_display(arabic_reshaper.reshape(text))
+# نام فایل سرویس‌اکانت گوگل
+SERVICE_ACCOUNT_FILE = "/etc/secrets/credentials.json"
 
-def init_db():
-    conn = sqlite3.connect("attendance.db")
+# آپلود فایل در گوگل درایو
+def upload_to_drive(file_path):
+    credentials = service_account.Credentials.from_service_account_file(
+        SERVICE_ACCOUNT_FILE, scopes=["https://www.googleapis.com/auth/drive"]
+    )
+    service = build("drive", "v3", credentials=credentials)
+    file_metadata = {"name": os.path.basename(file_path)}
+    media = MediaFileUpload(file_path)
+    service.files().create(body=file_metadata, media_body=media, fields="id").execute()
+
+# دانلود فایل دیتابیس از گوگل درایو
+def download_from_drive(filename):
+    credentials = service_account.Credentials.from_service_account_file(
+        SERVICE_ACCOUNT_FILE, scopes=["https://www.googleapis.com/auth/drive"]
+    )
+    service = build("drive", "v3", credentials=credentials)
+    results = service.files().list(q=f"name='{filename}'", fields="files(id)").execute()
+    files = results.get("files", [])
+    if files:
+        file_id = files[0]["id"]
+        request = service.files().get_media(fileId=file_id)
+        with open(filename, "wb") as f:
+            downloader = request.execute()
+            f.write(downloader)
+
+# دیتابیس را در صورت عدم وجود بساز
+def create_database():
+    conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    cursor.execute("""CREATE TABLE IF NOT EXISTS attendance (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER,
-        full_name TEXT,
-        action TEXT,
-        latitude REAL,
-        longitude REAL,
-        timestamp TEXT
-    )""")
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS attendance (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            full_name TEXT,
+            type TEXT,
+            latitude REAL,
+            longitude REAL,
+            timestamp TEXT
+        )
+    ''')
     conn.commit()
     conn.close()
 
-init_db()
-
-def upload_to_drive():
-    SERVICE_ACCOUNT_FILE = "/etc/secrets/credentials.json"
-    SCOPES = ["https://www.googleapis.com/auth/drive.file"]
-    creds = service_account.Credentials.from_service_account_file(
-        SERVICE_ACCOUNT_FILE, scopes=SCOPES)
-    service = build("drive", "v3", credentials=creds)
-    now = datetime.now().strftime("%Y-%m-%d_%H-%M")
-    file_metadata = {"name": f"attendance_{now}.db"}
-    media = MediaFileUpload("attendance.db", mimetype="application/octet-stream")
-    service.files().create(body=file_metadata, media_body=media).execute()
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = ReplyKeyboardMarkup(
-        [[KeyboardButton("ثبت ورود")], [KeyboardButton("ثبت خروج")]],
-        resize_keyboard=True
-    )
-    await update.message.reply_text("لطفاً نوع حضور را انتخاب کنید:", reply_markup=keyboard)
-
-async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.strip()
-    if text == "ثبت ورود":
-        context.user_data["action"] = "ورود"
-        await update.message.reply_text("اکنون لطفاً لوکیشن خود را ارسال کنید.")
-    elif text == "ثبت خروج":
-        context.user_data["action"] = "خروج"
-        await update.message.reply_text("اکنون لطفاً لوکیشن خود را ارسال کنید.")
-    else:
-        await update.message.reply_text("لطفاً یکی از دکمه‌های ورود یا خروج را انتخاب کنید.")
-
-async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    location = update.message.location
-    action = context.user_data.get("action")
-
-    if not action:
-        await update.message.reply_text("لطفاً ابتدا دکمه ورود یا خروج را انتخاب کنید.")
-        return
-
-    timestamp = datetime.now().isoformat()
-
-    conn = sqlite3.connect("attendance.db")
+# ذخیره حضور
+def save_attendance(user_id, full_name, type, lat, lon):
+    now = datetime.datetime.now().isoformat()
+    conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    cursor.execute("""INSERT INTO attendance (user_id, full_name, action, latitude, longitude, timestamp)
-                      VALUES (?, ?, ?, ?, ?, ?)""",
-                   (user.id, user.full_name, action, location.latitude, location.longitude, timestamp))
+    cursor.execute("INSERT INTO attendance (user_id, full_name, type, latitude, longitude, timestamp) VALUES (?, ?, ?, ?, ?, ?)",
+                   (user_id, full_name, type, lat, lon, now))
     conn.commit()
     conn.close()
 
-    await context.bot.send_message(
-        chat_id=ADMIN_CHAT_ID,
-        text=f"{user.full_name} ({action})\nموقعیت: https://maps.google.com/?q={location.latitude},{location.longitude}\nزمان: {timestamp}"
-    )
+# تولید گزارش
+def generate_reports(start_date, end_date):
+    conn = sqlite3.connect(DB_FILE)
+    df = pd.read_sql_query("SELECT * FROM attendance", conn)
+    df["timestamp"] = pd.to_datetime(df["timestamp"])
+    df = df[(df["timestamp"].dt.date >= pd.to_datetime(start_date).date()) &
+            (df["timestamp"].dt.date <= pd.to_datetime(end_date).date())]
 
-    await update.message.reply_text("ثبت شد. سپاسگزاریم!")
-    upload_to_drive()
-
-async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_CHAT_ID:
-        await update.message.reply_text("شما اجازه این کار را ندارید.")
-        return
-
-    try:
-        start_str, end_str = context.args[0], context.args[1]
-        start_date = datetime.fromisoformat(start_str)
-        end_date = datetime.fromisoformat(end_str)
-    except:
-        await update.message.reply_text("فرمت درست:\n/report YYYY-MM-DD YYYY-MM-DD")
-        return
-
-    conn = sqlite3.connect("attendance.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT user_id, full_name, action, timestamp FROM attendance ORDER BY timestamp")
-    records = cursor.fetchall()
-    conn.close()
-
-    data = defaultdict(lambda: {"name": "", "in": [], "out": []})
-    for uid, name, action, ts in records:
-        ts = datetime.fromisoformat(ts)
-        if start_date <= ts <= end_date:
-            data[uid]["name"] = name
-            if action == "ورود":
-                data[uid]["in"].append(ts)
-            elif action == "خروج":
-                data[uid]["out"].append(ts)
-
-    # گزارش PDF
-    pdf = canvas.Canvas("attendance_report.pdf")
-    pdf.setFont("Vazir", 12)
-    y = 800
-    title = reshape(f"گزارش حضور کاربران از {start_str} تا {end_str}")
-    pdf.drawString(100, y, title)
-    y -= 30
-
-    for record in data.values():
-        total_seconds = 0
-        for i in range(min(len(record["in"]), len(record["out"]))):
-            total_seconds += (record["out"][i] - record["in"][i]).total_seconds()
-        hours = round(total_seconds / 3600, 2)
-        line = reshape(f'{record["name"]} : {hours} ساعت حضور')
-        pdf.drawString(100, y, line)
+    pdf = canvas.Canvas(PDF_REPORT)
+    pdf.setFont("Helvetica", 12)
+    pdf.drawRightString(580, 820, f"گزارش حضور از {start_date} تا {end_date}")
+    y = 780
+    grouped = df.sort_values("timestamp").groupby(["user_id", df["timestamp"].dt.date])
+    for (user_id, date), group in grouped:
+        pdf.drawString(50, y, f"{group['full_name'].iloc[0]} - {date}")
         y -= 20
+        ins = group[group["type"] == "ورود"]["timestamp"].tolist()
+        outs = group[group["type"] == "خروج"]["timestamp"].tolist()
+        total = datetime.timedelta()
+        for i in range(min(len(ins), len(outs))):
+            t = pd.to_datetime(outs[i]) - pd.to_datetime(ins[i])
+            total += t
+        pdf.drawString(100, y, f"مدت حضور: {total}")
+        y -= 30
         if y < 50:
             pdf.showPage()
             y = 800
     pdf.save()
 
-    await context.bot.send_document(
+    df.to_excel(EXCEL_REPORT, index=False)
+    conn.close()
+
+# شروع
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    buttons = [
+        [KeyboardButton("ثبت ورود")],
+        [KeyboardButton("ثبت خروج")]
+    ]
+    reply_markup = ReplyKeyboardMarkup(buttons, resize_keyboard=True)
+    await update.message.reply_text("یکی از گزینه‌های زیر را انتخاب کنید:", reply_markup=reply_markup)
+
+# دکمه ورود/خروج
+async def choice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["type"] = update.message.text.replace("ثبت ", "")
+    await update.message.reply_text("اکنون لوکیشن خود را ارسال کنید:", reply_markup=ReplyKeyboardMarkup(
+        [[KeyboardButton("ارسال موقعیت", request_location=True)]], resize_keyboard=True))
+
+# دریافت لوکیشن
+async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    location = update.message.location
+    full_name = user.full_name or "نامشخص"
+    type = context.user_data.get("type")
+    if type not in ["ورود", "خروج"]:
+        await update.message.reply_text("لطفاً ابتدا دکمه ورود یا خروج را انتخاب کنید.")
+        return
+    save_attendance(user.id, full_name, type, location.latitude, location.longitude)
+    await update.message.reply_text("ثبت شد. سپاسگزاریم!")
+    await context.bot.send_message(
         chat_id=ADMIN_CHAT_ID,
-        document=open("attendance_report.pdf", "rb"),
-        caption="گزارش PDF"
+        text=f"{full_name} ({type})\nموقعیت:\nhttps://maps.google.com/?q={location.latitude},{location.longitude}\nزمان:\n{datetime.datetime.now().isoformat()}"
     )
+    context.user_data.clear()
 
-    # گزارش Excel
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Attendance"
-    ws.append(["نام", "ورود", "خروج", "مدت (ساعت)"])
-    for record in data.values():
-        for i in range(min(len(record["in"]), len(record["out"]))):
-            delta = record["out"][i] - record["in"][i]
-            hours = round(delta.total_seconds() / 3600, 2)
-            ws.append([record["name"], record["in"][i], record["out"][i], hours])
-    wb.save("attendance_report.xlsx")
+# گزارش
+async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_CHAT_ID:
+        await update.message.reply_text("دسترسی ندارید.")
+        return
+    args = context.args
+    if len(args) != 2:
+        await update.message.reply_text("فرمت صحیح: /report YYYY-MM-DD YYYY-MM-DD")
+        return
+    start_date, end_date = args
+    generate_reports(start_date, end_date)
+    await context.bot.send_document(chat_id=ADMIN_CHAT_ID, document=open(PDF_REPORT, "rb"))
+    await context.bot.send_document(chat_id=ADMIN_CHAT_ID, document=open(EXCEL_REPORT, "rb"))
 
-    await context.bot.send_document(
-        chat_id=ADMIN_CHAT_ID,
-        document=open("attendance_report.xlsx", "rb"),
-        caption="گزارش اکسل"
-    )
+# بارگذاری دیتابیس از گوگل درایو (در شروع)
+if os.path.exists(SERVICE_ACCOUNT_FILE):
+    try:
+        download_from_drive(DB_FILE)
+    except Exception as e:
+        print("دانلود از درایو انجام نشد:", e)
 
-if __name__ == "__main__":
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("report", report))
-    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_text))
-    app.add_handler(MessageHandler(filters.LOCATION, location_handler))
-    app.run_polling()
+# ساخت دیتابیس در صورت نیاز
+create_database()
+
+# اجرای بات
+app = ApplicationBuilder().token(BOT_TOKEN).build()
+app.add_handler(CommandHandler("start", start))
+app.add_handler(CommandHandler("report", report))
+app.add_handler(MessageHandler(filters.Regex("ثبت ورود|ثبت خروج"), choice_handler))
+app.add_handler(MessageHandler(filters.LOCATION, location_handler))
+app.run_polling()
+
+# بارگذاری دیتابیس روی درایو پس از هر اجرا
+try:
+    upload_to_drive(DB_FILE)
+except Exception as e:
+    print("آپلود در گوگل درایو انجام نشد:", e)
