@@ -4,9 +4,18 @@ import sqlite3
 from datetime import datetime
 from collections import defaultdict
 from reportlab.pdfgen import canvas
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfbase.pdfmetrics import registerFontFamily
+import os
 
 ADMIN_CHAT_ID = 123902504  # شناسه عددی مدیر
 BOT_TOKEN = "866070292:AAHXfqObC98ajBHnDRdfqs24haU6crDxlv8"
+
+# ثبت فونت فارسی با مسیر مطلق (برای اجرای موفق در Render)
+font_path = os.path.join(os.path.dirname(__file__), "fonts", "Vazir.ttf")
+pdfmetrics.registerFont(TTFont("Vazir", font_path))
+registerFontFamily("Vazir", normal="Vazir")
 
 def init_db():
     conn = sqlite3.connect("attendance.db")
@@ -86,7 +95,7 @@ async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     filename = "attendance_report.pdf"
     c = canvas.Canvas(filename)
-    c.setFont("Helvetica", 12)
+    c.setFont("Vazir", 12)
     y = 800
     c.drawString(100, y, f"گزارش حضور کاربران از {start_str} تا {end_str}")
     y -= 30
@@ -118,4 +127,3 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("report", report))
     app.add_handler(MessageHandler(filters.LOCATION, location_handler))
     app.run_polling()
-    
