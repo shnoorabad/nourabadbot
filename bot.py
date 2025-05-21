@@ -3,7 +3,6 @@ from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 import sqlite3
 from datetime import datetime
-from collections import defaultdict
 from reportlab.pdfgen import canvas
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
@@ -12,6 +11,7 @@ import os
 import arabic_reshaper
 from bidi.algorithm import get_display
 from openpyxl import Workbook
+from collections import defaultdict
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
@@ -19,14 +19,13 @@ from googleapiclient.http import MediaFileUpload
 ADMIN_CHAT_ID = 123902504  # شناسه عددی مدیر
 BOT_TOKEN = "866070292:AAESA0AZzrMvjEEPPJCw8iSUM9hDcRUvnvo"
 
-# فونت فارسی
+# ثبت فونت فارسی برای PDF
 font_path = os.path.join(os.path.dirname(__file__), "fonts", "Vazir.ttf")
 pdfmetrics.registerFont(TTFont("Vazir", font_path))
 registerFontFamily("Vazir", normal="Vazir")
 
-def reshape_text(text):
-    reshaped = arabic_reshaper.reshape(text)
-    return get_display(reshaped)
+def reshape(text):
+    return get_display(arabic_reshaper.reshape(text))
 
 def init_db():
     conn = sqlite3.connect("attendance.db")
@@ -46,15 +45,15 @@ def init_db():
 init_db()
 
 def upload_to_drive():
-    SCOPES = ['https://www.googleapis.com/auth/drive.file']
-    SERVICE_ACCOUNT_FILE = '/etc/secrets/credentials.json'
+    SERVICE_ACCOUNT_FILE = "/etc/secrets/credentials.json"
+    SCOPES = ["https://www.googleapis.com/auth/drive.file"]
     creds = service_account.Credentials.from_service_account_file(
         SERVICE_ACCOUNT_FILE, scopes=SCOPES)
-    service = build('drive', 'v3', credentials=creds)
+    service = build("drive", "v3", credentials=creds)
     now = datetime.now().strftime("%Y-%m-%d_%H-%M")
-    file_metadata = {'name': f'attendance_{now}.db'}
-    media = MediaFileUpload('attendance.db', mimetype='application/octet-stream')
-    service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+    file_metadata = {"name": f"attendance_{now}.db"}
+    media = MediaFileUpload("attendance.db", mimetype="application/octet-stream")
+    service.files().create(body=file_metadata, media_body=media).execute()
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = ReplyKeyboardMarkup(
@@ -64,18 +63,25 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("لطفاً نوع حضور را انتخاب کنید:", reply_markup=keyboard)
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text
-    if "ورود" in text:
+    text = update.message.text.strip()
+    if text == "ثبت ورود":
         context.user_data["action"] = "ورود"
         await update.message.reply_text("اکنون لطفاً لوکیشن خود را ارسال کنید.")
-    elif "خروج" in text:
+    elif text == "ثبت خروج":
         context.user_data["action"] = "خروج"
         await update.message.reply_text("اکنون لطفاً لوکیشن خود را ارسال کنید.")
+    else:
+        await update.message.reply_text("لطفاً یکی از دکمه‌های ورود یا خروج را انتخاب کنید.")
 
 async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     location = update.message.location
-    action = context.user_data.get("action", "نامشخص")
+    action = context.user_data.get("action")
+
+    if not action:
+        await update.message.reply_text("لطفاً ابتدا دکمه ورود یا خروج را انتخاب کنید.")
+        return
+
     timestamp = datetime.now().isoformat()
 
     conn = sqlite3.connect("attendance.db")
@@ -96,14 +102,14 @@ async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_CHAT_ID:
-        await update.message.reply_text("دسترسی ندارید.")
+        await update.message.reply_text("شما اجازه این کار را ندارید.")
         return
 
     try:
         start_str, end_str = context.args[0], context.args[1]
         start_date = datetime.fromisoformat(start_str)
         end_date = datetime.fromisoformat(end_str)
-    except (IndexError, ValueError):
+    except:
         await update.message.reply_text("فرمت درست:\n/report YYYY-MM-DD YYYY-MM-DD")
         return
 
@@ -113,59 +119,59 @@ async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     records = cursor.fetchall()
     conn.close()
 
-    summary = defaultdict(lambda: {"name": "", "in": [], "out": []})
-    for uid, name, action, time in records:
-        ts = datetime.fromisoformat(time)
+    data = defaultdict(lambda: {"name": "", "in": [], "out": []})
+    for uid, name, action, ts in records:
+        ts = datetime.fromisoformat(ts)
         if start_date <= ts <= end_date:
-            summary[uid]["name"] = name
-            summary[uid][action == "ورود" and "in" or "out"].append(ts)
+            data[uid]["name"] = name
+            if action == "ورود":
+                data[uid]["in"].append(ts)
+            elif action == "خروج":
+                data[uid]["out"].append(ts)
 
-    filename = "attendance_report.pdf"
-    c = canvas.Canvas(filename)
-    c.setFont("Vazir", 12)
+    # گزارش PDF
+    pdf = canvas.Canvas("attendance_report.pdf")
+    pdf.setFont("Vazir", 12)
     y = 800
-    title = reshape_text(f"گزارش حضور کاربران از {start_str} تا {end_str}")
-    c.drawString(100, y, title)
+    title = reshape(f"گزارش حضور کاربران از {start_str} تا {end_str}")
+    pdf.drawString(100, y, title)
     y -= 30
-    for record in summary.values():
+
+    for record in data.values():
         total_seconds = 0
         for i in range(min(len(record["in"]), len(record["out"]))):
-            delta = record["out"][i] - record["in"][i]
-            total_seconds += delta.total_seconds()
+            total_seconds += (record["out"][i] - record["in"][i]).total_seconds()
         hours = round(total_seconds / 3600, 2)
-        line = reshape_text(f'{record["name"]} : {hours} ساعت حضور')
-        c.drawString(100, y, line)
+        line = reshape(f'{record["name"]} : {hours} ساعت حضور')
+        pdf.drawString(100, y, line)
         y -= 20
         if y < 50:
-            c.showPage()
+            pdf.showPage()
             y = 800
-    c.save()
+    pdf.save()
 
     await context.bot.send_document(
         chat_id=ADMIN_CHAT_ID,
-        document=open(filename, "rb"),
-        caption=f"گزارش PDF از {start_str} تا {end_str}"
+        document=open("attendance_report.pdf", "rb"),
+        caption="گزارش PDF"
     )
 
+    # گزارش Excel
     wb = Workbook()
     ws = wb.active
-    ws.title = "گزارش حضور"
-    ws.append(["نام", "ورود", "خروج", "مدت حضور (ساعت)"])
-    for record in summary.values():
-        name = record["name"]
+    ws.title = "Attendance"
+    ws.append(["نام", "ورود", "خروج", "مدت (ساعت)"])
+    for record in data.values():
         for i in range(min(len(record["in"]), len(record["out"]))):
-            enter = record["in"][i]
-            exit = record["out"][i]
-            delta = exit - enter
+            delta = record["out"][i] - record["in"][i]
             hours = round(delta.total_seconds() / 3600, 2)
-            ws.append([name, str(enter), str(exit), hours])
-    excel_file = "attendance_report.xlsx"
-    wb.save(excel_file)
+            ws.append([record["name"], record["in"][i], record["out"][i], hours])
+    wb.save("attendance_report.xlsx")
 
     await context.bot.send_document(
         chat_id=ADMIN_CHAT_ID,
-        document=open(excel_file, "rb"),
-        caption="گزارش اکسل حضور کاربران"
+        document=open("attendance_report.xlsx", "rb"),
+        caption="گزارش اکسل"
     )
 
 if __name__ == "__main__":
