@@ -1,9 +1,6 @@
 
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import (
-    ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters,
-    ConversationHandler, CallbackQueryHandler
-)
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters, ConversationHandler
 import sqlite3
 from datetime import datetime
 import os
@@ -19,17 +16,15 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
 BOT_TOKEN = "866070292:AAG5jnr1idoHgZRWYLHTaKKb4ewy52lk9Pg"
-ADMIN_CHAT_ID = 123902504
+ADMIN_CHAT_ID 123902504
 DB_FILE = "attendance.db"
 FONT_PATH = "./fonts/Vazir.ttf"
 PDF_REPORT = "attendance_report.pdf"
 EXCEL_REPORT = "attendance_report.xlsx"
 SERVICE_ACCOUNT_FILE = "/etc/secrets/credentials.json"
 
-ASK_LEAVE_TYPE, ASK_DATE, ASK_HOURS, ASK_END_DATE = range(4)
-ASK_START_DATE, ASK_END_DATE_REPORT = range(4, 6)
-user_states = {}
-leave_requests = {}
+ASK_START, ASK_END = range(2)
+admin_report_requests = {}
 
 def init_db():
     conn = sqlite3.connect(DB_FILE)
@@ -43,19 +38,6 @@ def init_db():
             latitude REAL,
             longitude REAL,
             timestamp TEXT
-        )
-    """)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS leave_requests (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            full_name TEXT,
-            leave_type TEXT,
-            date TEXT,
-            start_hour TEXT,
-            end_hour TEXT,
-            status TEXT DEFAULT 'در انتظار',
-            submitted_at TEXT
         )
     """)
     conn.commit()
@@ -77,6 +59,14 @@ def save_attendance(user_id, full_name, action, latitude, longitude):
     conn.commit()
     conn.close()
 
+def upload_to_drive():
+    creds = service_account.Credentials.from_service_account_file(
+        SERVICE_ACCOUNT_FILE, scopes=["https://www.googleapis.com/auth/drive.file"])
+    service = build("drive", "v3", credentials=creds)
+    file_metadata = {"name": f"attendance_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.db"}
+    media = MediaFileUpload(DB_FILE, mimetype="application/octet-stream")
+    service.files().create(body=file_metadata, media_body=media, fields="id").execute()
+
 def reshape(text):
     return get_display(arabic_reshaper.reshape(text))
 
@@ -87,28 +77,12 @@ def create_pdf_report(records, start_date, end_date):
     c.drawRightString(550, 800, reshape(f"گزارش حضور از {start_date} تا {end_date}"))
 
     y = 770
-    grouped = defaultdict(list)
     for row in records:
-        key = (row[0], row[4][:10])
-        grouped[key].append(row)
-
-    for (name, date), actions in grouped.items():
-        total = 0
-        ins = [datetime.fromisoformat(r[4]) for r in actions if r[1] == "ورود"]
-        outs = [datetime.fromisoformat(r[4]) for r in actions if r[1] == "خروج"]
-        for i in range(min(len(ins), len(outs))):
-            total += (outs[i] - ins[i]).total_seconds()
-        total_hours = round(total / 3600, 2)
-
-        c.drawRightString(550, y, reshape(f"{name} - {date}"))
+        full_name, action, lat, lon, timestamp = row
+        t = datetime.fromisoformat(timestamp)
+        line = f"{full_name} | {action} | {t.strftime('%Y-%m-%d %H:%M')} | مختصات: {lat:.5f}, {lon:.5f}"
+        c.drawRightString(550, y, reshape(line))
         y -= 20
-        for r in actions:
-            t = datetime.fromisoformat(r[4])
-            line = f"{r[1]} | {t.strftime('%H:%M')} | مختصات: {r[2]:.5f}, {r[3]:.5f}"
-            c.drawRightString(550, y, reshape(line))
-            y -= 20
-        c.drawRightString(550, y, reshape(f"جمع کل: {total_hours} ساعت"))
-        y -= 30
         if y < 50:
             c.showPage()
             y = 800
@@ -118,125 +92,53 @@ def create_excel_report(records):
     wb = Workbook()
     ws = wb.active
     ws.title = "Attendance"
-    ws.append(["نام", "تاریخ", "ورود/خروج", "ساعت", "مختصات", "مدت (ساعت)"])
-
-    grouped = defaultdict(list)
-    for r in records:
-        key = (r[0], r[4][:10])
-        grouped[key].append(r)
-
-    for (name, date), actions in grouped.items():
-        ins = [r for r in actions if r[1] == "ورود"]
-        outs = [r for r in actions if r[1] == "خروج"]
-        total = 0
-        for i in range(min(len(ins), len(outs))):
-            t1 = datetime.fromisoformat(ins[i][4])
-            t2 = datetime.fromisoformat(outs[i][4])
-            delta = (t2 - t1).total_seconds()
-            total += delta
-            ws.append([name, date, "ورود", t1.strftime("%H:%M"), f"{ins[i][2]:.5f},{ins[i][3]:.5f}", ""])
-            ws.append(["", "", "خروج", t2.strftime("%H:%M"), f"{outs[i][2]:.5f},{outs[i][3]:.5f}", round(delta / 3600, 2)])
-        ws.append(["", "", "", "", "جمع کل:", round(total / 3600, 2)])
-        ws.append([])
-
+    ws.append(["نام", "عملیات", "تاریخ‌وساعت", "عرض جغرافیایی", "طول جغرافیایی"])
+    for row in records:
+        ws.append(row)
     wb.save(EXCEL_REPORT)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [[KeyboardButton("درخواست مرخصی")]]
-    await update.message.reply_text("سلام! یکی از گزینه‌ها را انتخاب کنید.", reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
+    is_admin = update.effective_user.id == ADMIN_CHAT_ID
+    keyboard = [[KeyboardButton("ثبت حضور", request_location=True)]]
+    if is_admin:
+        keyboard.append([KeyboardButton("گزارش‌گیری")])
+    await update.message.reply_text("یکی از گزینه‌ها را انتخاب کنید:", reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
 
-async def request_leave_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("نوع مرخصی را وارد کنید (ساعتی / روزانه):")
-    return ASK_LEAVE_TYPE
-
-async def ask_leave_type(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.strip()
-    if text not in ["ساعتی", "روزانه"]:
-        await update.message.reply_text("لطفاً فقط یکی از گزینه‌های 'ساعتی' یا 'روزانه' را وارد کنید.")
-        return ASK_LEAVE_TYPE
-
-    context.user_data["leave_type"] = text
-    if text == "روزانه":
-        await update.message.reply_text("تاریخ شروع مرخصی را وارد کنید (مثلاً 1403/03/10):")
-        return ASK_DATE
-    else:
-        await update.message.reply_text("تاریخ مرخصی ساعتی را وارد کنید (مثلاً 1403/03/10):")
-        return ASK_DATE
-
-async def ask_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data["date"] = update.message.text.strip()
-    if context.user_data["leave_type"] == "روزانه":
-        await update.message.reply_text("تاریخ پایان مرخصی را وارد کنید (مثلاً 1403/03/12):")
-        return ASK_END_DATE
-    else:
-        await update.message.reply_text("ساعت شروع و پایان را وارد کنید (مثلاً 09 تا 12):")
-        return ASK_HOURS
-
-async def ask_end_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    start = context.user_data["date"]
-    end = update.message.text.strip()
-    full_name = update.effective_user.full_name
-    user_id = update.effective_user.id
-    now = datetime.now().isoformat()
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute("INSERT INTO leave_requests (user_id, full_name, leave_type, date, submitted_at) VALUES (?, ?, ?, ?, ?)",
-                   (user_id, full_name, "روزانه", f"{start} تا {end}", now))
-    conn.commit()
-    conn.close()
-    await update.message.reply_text("درخواست شما ثبت شد و در انتظار بررسی ادمین است.")
-    await send_leave_request_to_admin(user_id, full_name, "روزانه", f"{start} تا {end}", "", "")
+async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.text == "گزارش‌گیری" and update.effective_user.id == ADMIN_CHAT_ID:
+        await update.message.reply_text("تاریخ شروع را وارد کنید (YYYY-MM-DD):")
+        return ASK_START
     return ConversationHandler.END
 
-async def ask_hours(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    hours = update.message.text.strip()
-    if "تا" not in hours:
-        await update.message.reply_text("لطفاً ساعت را به فرمت '09 تا 12' وارد کنید.")
-        return ASK_HOURS
-
-    start_hour, end_hour = [s.strip() for s in hours.split("تا")]
-    full_name = update.effective_user.full_name
+async def ask_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    date = context.user_data["date"]
-    now = datetime.now().isoformat()
+    admin_report_requests[user_id] = {"start": update.message.text}
+    await update.message.reply_text("تاریخ پایان را وارد کنید (YYYY-MM-DD):")
+    return ASK_END
+
+async def ask_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    admin_report_requests[user_id]["end"] = update.message.text
+    start = admin_report_requests[user_id]["start"]
+    end = admin_report_requests[user_id]["end"]
+
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO leave_requests (user_id, full_name, leave_type, date, start_hour, end_hour, submitted_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                   (user_id, full_name, "ساعتی", date, start_hour, end_hour, now))
-    conn.commit()
+    cursor.execute("SELECT full_name, action, latitude, longitude, timestamp FROM attendance WHERE DATE(timestamp) BETWEEN ? AND ?", (start, end))
+    records = cursor.fetchall()
     conn.close()
-    await update.message.reply_text("درخواست شما ثبت شد و در انتظار بررسی ادمین است.")
-    await send_leave_request_to_admin(user_id, full_name, "ساعتی", date, start_hour, end_hour)
+
+    create_pdf_report(records, start, end)
+    create_excel_report(records)
+
+    await update.message.reply_text("گزارش آماده است:")
+    await context.bot.send_document(chat_id=user_id, document=open(PDF_REPORT, "rb"))
+    await context.bot.send_document(chat_id=user_id, document=open(EXCEL_REPORT, "rb"))
     return ConversationHandler.END
 
-async def send_leave_request_to_admin(user_id, full_name, leave_type, date, start_hour, end_hour):
-    text = f"""درخواست مرخصی جدید:
-نام: {full_name}
-نوع: {leave_type}
-تاریخ: {date}"""
-    if leave_type == "ساعتی":
-        text += f"\nساعت: {start_hour} تا {end_hour}"
-    buttons = InlineKeyboardMarkup([
-        [InlineKeyboardButton("تأیید", callback_data=f"approve_{user_id}_{date}"),
-         InlineKeyboardButton("رد", callback_data=f"reject_{user_id}_{date}")]
-    ])
-    await app.bot.send_message(chat_id=ADMIN_CHAT_ID, text=text, reply_markup=buttons)
-
-async def handle_approval(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    data = query.data
-    action, user_id, date = data.split("_", 2)
-    status = "تأیید شد" if action == "approve" else "رد شد"
-
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute("UPDATE leave_requests SET status = ? WHERE user_id = ? AND date = ?", (status, user_id, date))
-    conn.commit()
-    conn.close()
-
-    await query.edit_message_text(f"درخواست مرخصی مربوط به {date} {status} شد.")
-    await app.bot.send_message(chat_id=int(user_id), text=f"درخواست مرخصی شما برای {date} {status} شد.")
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("گزارش‌گیری لغو شد.")
+    return ConversationHandler.END
 
 async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -248,95 +150,24 @@ async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id=ADMIN_CHAT_ID,
         text=f"{user.full_name} - {action}\nموقعیت: https://maps.google.com/?q={location.latitude},{location.longitude}\nزمان: {datetime.now().isoformat()}"
     )
+    upload_to_drive()
 
-def main():
+if __name__ == "__main__":
     if not os.path.exists(DB_FILE):
         init_db()
 
-    global app
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    leave_conv = ConversationHandler(
-        entry_points=[MessageHandler(filters.TEXT & filters.Regex("درخواست مرخصی"), request_leave_start)],
+    conv_handler = ConversationHandler(
+        entry_points=[MessageHandler(filters.TEXT & filters.Regex("گزارش‌گیری"), text_handler)],
         states={
-            ASK_LEAVE_TYPE: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_leave_type)],
-            ASK_DATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_date)],
-            ASK_END_DATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_end_date)],
-            ASK_HOURS: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_hours)],
+            ASK_START: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_start)],
+            ASK_END: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_end)],
         },
-        fallbacks=[],
+        fallbacks=[CommandHandler("cancel", cancel)],
     )
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(handle_approval))
-    app.add_handler(leave_conv)
+    app.add_handler(conv_handler)
     app.add_handler(MessageHandler(filters.LOCATION, location_handler))
-    app.run_polling()
-
-if __name__ == "__main__":
-    main()
-
-
-from telegram.constants import ParseMode
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    if user_id == ADMIN_CHAT_ID:
-        keyboard = [
-            [KeyboardButton("ثبت حضور/خروج")],
-            [KeyboardButton("درخواست مرخصی")],
-            [KeyboardButton("گزارش‌گیری")]
-        ]
-    else:
-        keyboard = [
-            [KeyboardButton("ثبت حضور/خروج")],
-            [KeyboardButton("درخواست مرخصی")]
-        ]
-
-    await update.message.reply_text(
-        "به ربات حضور و غیاب خوش آمدید. یکی از گزینه‌ها را انتخاب کنید:",
-        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    )
-
-async def report_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    if user_id != ADMIN_CHAT_ID:
-        await update.message.reply_text("دسترسی فقط برای مدیر مجاز است.")
-        return
-
-    await update.message.reply_text("تاریخ شروع گزارش را وارد کنید (مثلاً 2025-05-01):")
-    return ASK_START_DATE
-
-async def ask_start_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data["start"] = update.message.text.strip()
-    await update.message.reply_text("تاریخ پایان گزارش را وارد کنید (مثلاً 2025-05-21):")
-    return ASK_END_DATE_REPORT
-
-async def ask_end_date_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    start = context.user_data["start"]
-    end = update.message.text.strip()
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute("SELECT full_name, action, latitude, longitude, timestamp FROM attendance WHERE date(timestamp) BETWEEN ? AND ?", (start, end))
-    records = cursor.fetchall()
-    conn.close()
-
-    if not records:
-        await update.message.reply_text("هیچ رکوردی یافت نشد.")
-        return ConversationHandler.END
-
-    create_pdf_report(records, start, end)
-    create_excel_report(records)
-
-    await context.bot.send_document(chat_id=update.effective_chat.id, document=open(PDF_REPORT, "rb"))
-    await context.bot.send_document(chat_id=update.effective_chat.id, document=open(EXCEL_REPORT, "rb"))
-    return ConversationHandler.END
-
-app.add_handler(ConversationHandler(
-    entry_points=[MessageHandler(filters.TEXT & filters.Regex("گزارش‌گیری"), report_handler)],
-    states={
-        ASK_START_DATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_start_date)],
-        ASK_END_DATE_REPORT: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_end_date_report)],
-    },
-    fallbacks=[]
-))
+    app.run_polling(
