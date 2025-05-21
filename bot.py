@@ -211,7 +211,7 @@ async def ask_hours(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 async def send_leave_request_to_admin(user_id, full_name, leave_type, date, start_hour, end_hour):
-    text = f"درخواست مرخصی جدید:
+    text = f"درخواست مرخصی جدید برای بررسی ارسال شد."
 نام: {full_name}
 نوع: {leave_type}
 تاریخ: {date}"
