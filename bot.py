@@ -281,6 +281,10 @@ from telegram.constants import ParseMode
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
+    full_name = update.effective_user.full_name
+    context.user_data["user_id"] = user_id
+    context.user_data["full_name"] = full_name
+
     if user_id == ADMIN_CHAT_ID:
         keyboard = [
             [KeyboardButton("ثبت حضور/خروج", request_location=True)],
@@ -292,7 +296,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [KeyboardButton("ثبت حضور/خروج", request_location=True)],
             [KeyboardButton("درخواست مرخصی")]
         ]
+
     await update.message.reply_text(
+        "سلام! یکی از گزینه‌ها را انتخاب کنید.",
+        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    )
         "به ربات حضور و غیاب خوش آمدید.",
         reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     )
