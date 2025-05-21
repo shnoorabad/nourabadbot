@@ -77,12 +77,28 @@ def create_pdf_report(records, start_date, end_date):
     c.drawRightString(550, 800, reshape(f"گزارش حضور از {start_date} تا {end_date}"))
 
     y = 770
+    grouped = defaultdict(list)
     for row in records:
-        full_name, action, lat, lon, timestamp = row
-        t = datetime.fromisoformat(timestamp)
-        line = f"{full_name} | {action} | {t.strftime('%Y-%m-%d %H:%M')} | مختصات: {lat:.5f}, {lon:.5f}"
-        c.drawRightString(550, y, reshape(line))
+        key = (row[0], row[4][:10])  # (full_name, date)
+        grouped[key].append(row)
+
+    for (name, date), actions in grouped.items():
+        total = 0
+        ins = [datetime.fromisoformat(r[4]) for r in actions if r[1] == "ورود"]
+        outs = [datetime.fromisoformat(r[4]) for r in actions if r[1] == "خروج"]
+        for i in range(min(len(ins), len(outs))):
+            total += (outs[i] - ins[i]).total_seconds()
+        total_hours = round(total / 3600, 2)
+
+        c.drawRightString(550, y, reshape(f"{name} - {date}"))
         y -= 20
+        for r in actions:
+            t = datetime.fromisoformat(r[4])
+            line = f"{r[1]} | {t.strftime('%H:%M')} | مختصات: {r[2]:.5f}, {r[3]:.5f}"
+            c.drawRightString(550, y, reshape(line))
+            y -= 20
+        c.drawRightString(550, y, reshape(f"جمع کل: {total_hours} ساعت"))
+        y -= 30
         if y < 50:
             c.showPage()
             y = 800
@@ -92,17 +108,44 @@ def create_excel_report(records):
     wb = Workbook()
     ws = wb.active
     ws.title = "Attendance"
-    ws.append(["نام", "عملیات", "تاریخ‌وساعت", "عرض جغرافیایی", "طول جغرافیایی"])
-    for row in records:
-        ws.append(row)
+    ws.append(["نام", "تاریخ", "ورود/خروج", "ساعت", "مختصات", "مدت (ساعت)"])
+
+    grouped = defaultdict(list)
+    for r in records:
+        key = (r[0], r[4][:10])
+        grouped[key].append(r)
+
+    for (name, date), actions in grouped.items():
+        ins = [r for r in actions if r[1] == "ورود"]
+        outs = [r for r in actions if r[1] == "خروج"]
+        total = 0
+        for i in range(min(len(ins), len(outs))):
+            t1 = datetime.fromisoformat(ins[i][4])
+            t2 = datetime.fromisoformat(outs[i][4])
+            delta = (t2 - t1).total_seconds()
+            total += delta
+            ws.append([name, date, "ورود", t1.strftime("%H:%M"), f"{ins[i][2]:.5f},{ins[i][3]:.5f}", ""])
+            ws.append(["", "", "خروج", t2.strftime("%H:%M"), f"{outs[i][2]:.5f},{outs[i][3]:.5f}", round(delta / 3600, 2)])
+        ws.append(["", "", "", "", "جمع کل:", round(total / 3600, 2)])
+        ws.append([])
+
     wb.save(EXCEL_REPORT)
+
+# ادامه فایل (start, handlers ...) را می‌توان در پیام بعدی فرستاد
+
+
+
+from telegram.ext import MessageHandler, filters, ConversationHandler
+
+ASK_START, ASK_END = range(2)
+admin_report_requests = {}
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     is_admin = update.effective_user.id == ADMIN_CHAT_ID
     keyboard = [[KeyboardButton("ثبت حضور", request_location=True)]]
     if is_admin:
         keyboard.append([KeyboardButton("گزارش‌گیری")])
-    await update.message.reply_text("یکی از گزینه‌ها را انتخاب کنید:", reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
+    await update.message.reply_text("لطفاً یک گزینه را انتخاب کنید:", reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
 
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.text == "گزارش‌گیری" and update.effective_user.id == ADMIN_CHAT_ID:
@@ -137,7 +180,7 @@ async def ask_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("گزارش‌گیری لغو شد.")
+    await update.message.reply_text("عملیات لغو شد.")
     return ConversationHandler.END
 
 async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
