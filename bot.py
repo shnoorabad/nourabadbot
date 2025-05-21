@@ -1,3 +1,4 @@
+
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 import sqlite3
@@ -27,7 +28,6 @@ def reshape_text(text):
     reshaped = arabic_reshaper.reshape(text)
     return get_display(reshaped)
 
-# ساخت دیتابیس
 def init_db():
     conn = sqlite3.connect("attendance.db")
     cursor = conn.cursor()
@@ -45,37 +45,37 @@ def init_db():
 
 init_db()
 
-# آپلود در Google Drive
 def upload_to_drive():
     SCOPES = ['https://www.googleapis.com/auth/drive.file']
     SERVICE_ACCOUNT_FILE = '/etc/secrets/credentials.json'
-
     creds = service_account.Credentials.from_service_account_file(
         SERVICE_ACCOUNT_FILE, scopes=SCOPES)
-
     service = build('drive', 'v3', credentials=creds)
-
     now = datetime.now().strftime("%Y-%m-%d_%H-%M")
     file_metadata = {'name': f'attendance_{now}.db'}
     media = MediaFileUpload('attendance.db', mimetype='application/octet-stream')
     service.files().create(body=file_metadata, media_body=media, fields='id').execute()
 
-# شروع ربات
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = ReplyKeyboardMarkup(
-        [[KeyboardButton("ثبت ورود", request_location=True)],
-         [KeyboardButton("ثبت خروج", request_location=True)]],
+        [[KeyboardButton("ثبت ورود")], [KeyboardButton("ثبت خروج")]],
         resize_keyboard=True
     )
-    await update.message.reply_text("لطفاً یکی از گزینه‌ها را انتخاب کنید و لوکیشن خود را ارسال نمایید.", reply_markup=keyboard)
+    await update.message.reply_text("لطفاً نوع حضور را انتخاب کنید:", reply_markup=keyboard)
 
-# ثبت حضور با لوکیشن
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text
+    if "ورود" in text:
+        context.user_data["action"] = "ورود"
+        await update.message.reply_text("اکنون لطفاً لوکیشن خود را ارسال کنید.")
+    elif "خروج" in text:
+        context.user_data["action"] = "خروج"
+        await update.message.reply_text("اکنون لطفاً لوکیشن خود را ارسال کنید.")
+
 async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     location = update.message.location
-    message_text = update.message.text or ""
-
-    action = "ورود" if "ورود" in message_text else "خروج"
+    action = context.user_data.get("action", "نامشخص")
     timestamp = datetime.now().isoformat()
 
     conn = sqlite3.connect("attendance.db")
@@ -92,11 +92,8 @@ async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     await update.message.reply_text("ثبت شد. سپاسگزاریم!")
-
-    # آپلود خودکار دیتابیس در گوگل درایو
     upload_to_drive()
 
-# تولید گزارش PDF و Excel
 async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_CHAT_ID:
         await update.message.reply_text("دسترسی ندارید.")
@@ -107,7 +104,7 @@ async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
         start_date = datetime.fromisoformat(start_str)
         end_date = datetime.fromisoformat(end_str)
     except (IndexError, ValueError):
-        await update.message.reply_text("لطفاً از فرمت درست استفاده کنید:\n/report YYYY-MM-DD YYYY-MM-DD")
+        await update.message.reply_text("فرمت درست:\n/report YYYY-MM-DD YYYY-MM-DD")
         return
 
     conn = sqlite3.connect("attendance.db")
@@ -123,7 +120,6 @@ async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
             summary[uid]["name"] = name
             summary[uid][action == "ورود" and "in" or "out"].append(ts)
 
-    # PDF
     filename = "attendance_report.pdf"
     c = canvas.Canvas(filename)
     c.setFont("Vazir", 12)
@@ -151,7 +147,6 @@ async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
         caption=f"گزارش PDF از {start_str} تا {end_str}"
     )
 
-    # Excel
     wb = Workbook()
     ws = wb.active
     ws.title = "گزارش حضور"
@@ -173,10 +168,10 @@ async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
         caption="گزارش اکسل حضور کاربران"
     )
 
-# اجرای ربات
 if __name__ == "__main__":
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("report", report))
+    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_text))
     app.add_handler(MessageHandler(filters.LOCATION, location_handler))
     app.run_polling()
