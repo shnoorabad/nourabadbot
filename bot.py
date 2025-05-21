@@ -9,10 +9,10 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase.pdfmetrics import registerFontFamily
 import os
 
-ADMIN_CHAT_ID = 123902504  # شناسه عددی مدیر
+ADMIN_CHAT_ID = 123902504
 BOT_TOKEN = "866070292:AAHXfqObC98ajBHnDRdfqs24haU6crDxlv8"
 
-# ثبت فونت فارسی با مسیر مطلق (برای اجرای موفق در Render)
+# ثبت فونت فارسی
 font_path = os.path.join(os.path.dirname(__file__), "fonts", "Vazir.ttf")
 pdfmetrics.registerFont(TTFont("Vazir", font_path))
 registerFontFamily("Vazir", normal="Vazir")
@@ -97,7 +97,9 @@ async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     c = canvas.Canvas(filename)
     c.setFont("Vazir", 12)
     y = 800
-    c.drawString(100, y, f"گزارش حضور کاربران از {start_str} تا {end_str}")
+
+    title = f"گزارش حضور کاربران از {start_str} تا {end_str}"[::-1]
+    c.drawString(100, y, title)
     y -= 30
 
     for record in summary.values():
@@ -106,7 +108,7 @@ async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
             delta = record["out"][i] - record["in"][i]
             total_seconds += delta.total_seconds()
         hours = round(total_seconds / 3600, 2)
-        line = f'{record["name"]}: {hours} ساعت حضور'
+        line = f'{record["name"]}: {hours} ساعت حضور'[::-1]
         c.drawString(100, y, line)
         y -= 20
         if y < 50:
