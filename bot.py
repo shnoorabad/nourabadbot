@@ -19,14 +19,13 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
 BOT_TOKEN = "866070292:AAG5jnr1idoHgZRWYLHTaKKb4ewy52lk9Pg"
-ADMIN_CHAT_ID 123902504
+ADMIN_CHAT_ID = 123902504
 DB_FILE = "attendance.db"
 FONT_PATH = "./fonts/Vazir.ttf"
 PDF_REPORT = "attendance_report.pdf"
 EXCEL_REPORT = "attendance_report.xlsx"
 SERVICE_ACCOUNT_FILE = "/etc/secrets/credentials.json"
 
-# مراحل گفت‌وگو
 ASK_LEAVE_TYPE, ASK_DATE, ASK_HOURS, ASK_END_DATE = range(4)
 ASK_START_DATE, ASK_END_DATE_REPORT = range(4, 6)
 user_states = {}
@@ -61,8 +60,6 @@ def init_db():
     """)
     conn.commit()
     conn.close()
-
-
 
 def get_next_action(user_id):
     conn = sqlite3.connect(DB_FILE)
@@ -144,7 +141,9 @@ def create_excel_report(records):
 
     wb.save(EXCEL_REPORT)
 
-
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = [[KeyboardButton("درخواست مرخصی")]]
+    await update.message.reply_text("سلام! یکی از گزینه‌ها را انتخاب کنید.", reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
 
 async def request_leave_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("نوع مرخصی را وارد کنید (ساعتی / روزانه):")
@@ -211,20 +210,17 @@ async def ask_hours(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 async def send_leave_request_to_admin(user_id, full_name, leave_type, date, start_hour, end_hour):
-    text = f"درخواست مرخصی جدید برای بررسی ارسال شد."
+    text = f"""درخواست مرخصی جدید:
 نام: {full_name}
 نوع: {leave_type}
-تاریخ: {date}"
+تاریخ: {date}"""
     if leave_type == "ساعتی":
-        text += f"
-ساعت: {start_hour} تا {end_hour}"
+        text += f"\nساعت: {start_hour} تا {end_hour}"
     buttons = InlineKeyboardMarkup([
         [InlineKeyboardButton("تأیید", callback_data=f"approve_{user_id}_{date}"),
          InlineKeyboardButton("رد", callback_data=f"reject_{user_id}_{date}")]
     ])
     await app.bot.send_message(chat_id=ADMIN_CHAT_ID, text=text, reply_markup=buttons)
-
-
 
 async def handle_approval(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -240,7 +236,7 @@ async def handle_approval(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn.close()
 
     await query.edit_message_text(f"درخواست مرخصی مربوط به {date} {status} شد.")
-await app.bot.send_message(chat_id=int(user_id), text=f"درخواست مرخصی شما برای {date} {status} شد.")
+    await app.bot.send_message(chat_id=int(user_id), text=f"درخواست مرخصی شما برای {date} {status} شد.")
 
 async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
