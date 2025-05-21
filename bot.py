@@ -301,9 +301,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "سلام! یکی از گزینه‌ها را انتخاب کنید.",
         reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     )
-        "به ربات حضور و غیاب خوش آمدید.",
-        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    )
+      await update.message.reply_text(
+    "به ربات حضور و غیاب خوش آمدید.",
+    reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+)
 
 async def report_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
