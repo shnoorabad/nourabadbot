@@ -275,3 +275,67 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+from telegram.constants import ParseMode
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id == ADMIN_CHAT_ID:
+        keyboard = [
+            [KeyboardButton("ثبت حضور/خروج", request_location=True)],
+            [KeyboardButton("درخواست مرخصی")],
+            [KeyboardButton("گزارش‌گیری")]
+        ]
+    else:
+        keyboard = [
+            [KeyboardButton("ثبت حضور/خروج", request_location=True)],
+            [KeyboardButton("درخواست مرخصی")]
+        ]
+    await update.message.reply_text(
+        "به ربات حضور و غیاب خوش آمدید.",
+        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    )
+
+async def report_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id != ADMIN_CHAT_ID:
+        await update.message.reply_text("دسترسی فقط برای مدیر مجاز است.")
+        return
+
+    await update.message.reply_text("تاریخ شروع گزارش را وارد کنید (مثلاً 2025-05-01):")
+    return ASK_START_DATE
+
+async def ask_start_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["start"] = update.message.text.strip()
+    await update.message.reply_text("تاریخ پایان گزارش را وارد کنید (مثلاً 2025-05-21):")
+    return ASK_END_DATE_REPORT
+
+async def ask_end_date_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    start = context.user_data["start"]
+    end = update.message.text.strip()
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT full_name, action, latitude, longitude, timestamp FROM attendance WHERE date(timestamp) BETWEEN ? AND ?", (start, end))
+    records = cursor.fetchall()
+    conn.close()
+
+    if not records:
+        await update.message.reply_text("هیچ رکوردی یافت نشد.")
+        return ConversationHandler.END
+
+    create_pdf_report(records, start, end)
+    create_excel_report(records)
+
+    await context.bot.send_document(chat_id=update.effective_chat.id, document=open(PDF_REPORT, "rb"))
+    await context.bot.send_document(chat_id=update.effective_chat.id, document=open(EXCEL_REPORT, "rb"))
+    return ConversationHandler.END
+
+app.add_handler(ConversationHandler(
+    entry_points=[MessageHandler(filters.TEXT & filters.Regex("گزارش‌گیری"), report_handler)],
+    states={
+        ASK_START_DATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_start_date)],
+        ASK_END_DATE_REPORT: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_end_date_report)],
+    },
+    fallbacks=[]
+))
