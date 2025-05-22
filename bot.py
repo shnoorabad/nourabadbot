@@ -36,7 +36,9 @@ def reshape(text):
 
 def get_today_shamsi():
     return jdatetime.datetime.fromgregorian(datetime=datetime.now()).strftime("%Y/%m/%d")
-
+def shamsi_to_miladi(shamsi_date):
+    parts = [int(x) for x in shamsi_date.replace("-", "/").split("/")]
+    return jdatetime.date(parts[0], parts[1], parts[2]).togregorian().isoformat()
 def init_db():
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
@@ -265,8 +267,8 @@ async def ask_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def ask_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    start = admin_report_requests[user_id]["start"]
-    end = update.message.text
+    start = shamsi_to_miladi(admin_report_requests[user_id]["start"])
+end = shamsi_to_miladi(update.message.text.strip())
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute("SELECT full_name, action, latitude, longitude, timestamp FROM attendance WHERE DATE(timestamp) BETWEEN ? AND ?", (start, end))
