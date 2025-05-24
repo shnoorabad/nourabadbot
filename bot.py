@@ -75,9 +75,14 @@ def init_db():
     conn.commit()
     conn.close()
 def get_next_action(user_id):
+    today = datetime.now(iran).date().isoformat()
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    cursor.execute("SELECT action FROM attendance WHERE user_id = ? ORDER BY timestamp DESC LIMIT 1", (user_id,))
+    cursor.execute("""
+        SELECT action FROM attendance 
+        WHERE user_id = ? AND DATE(timestamp) = ? 
+        ORDER BY timestamp DESC LIMIT 1
+    """, (user_id, today))
     row = cursor.fetchone()
     conn.close()
     return "خروج" if row and row[0] == "ورود" else "ورود"
