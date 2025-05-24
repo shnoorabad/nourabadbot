@@ -171,7 +171,7 @@ async def ask_leave_hours(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("درخواست شما ثبت شد و در انتظار تأیید ادمین است.")
     await send_leave_request_to_admin(user_id, full_name, "ساعتی", date, start_hour, end_hour)
     return ConversationHandler.END
- async def handle_approval(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_approval(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     data = query.data
