@@ -4,7 +4,7 @@ from telegram.ext import (
     ConversationHandler, CallbackQueryHandler
 )
 import sqlite3
-from datetime import datetime
+from datetime import datetime, time
 import os
 import jdatetime
 from collections import defaultdict
