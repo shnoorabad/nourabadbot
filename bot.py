@@ -304,7 +304,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[KeyboardButton("ثبت حضور", request_location=True)], [KeyboardButton("درخواست مرخصی")]]
     if is_admin:
         keyboard.append([KeyboardButton("گزارش‌گیری")])
-    await update.message.reply_text("یکی از گزینه‌ها را انتخاب کنید:", reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
+        await update.message.reply_text("یکی از گزینه‌ها را انتخاب کنید:", reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
 
 async def report_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     today = get_today_shamsi()
@@ -324,8 +324,8 @@ async def ask_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
     start = shamsi_to_miladi(admin_report_requests[user_id]["start"])
     end = shamsi_to_miladi(update.message.text.strip())
 if not start or not end:
-    await update.message.reply_text("تاریخ شروع یا پایان معتبر نیست.")
-    return ConversationHandler.END
+     await update.message.reply_text("تاریخ شروع یا پایان معتبر نیست.")
+     return ConversationHandler.END
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     start_datetime = datetime.combine(start, time(0, 0)).isoformat()
