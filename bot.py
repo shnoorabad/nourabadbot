@@ -159,6 +159,7 @@ async def ask_leave_type(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         f"تاریخ مرخصی را وارد کنید :\n`{today}`",
         parse_mode="Markdown"
+    )
     return ASK_LEAVE_DATE
 
 async def ask_leave_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
