@@ -232,7 +232,7 @@ async def handle_approval(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await app.bot.send_message(chat_id=int(user_id), text=f"درخواست مرخصی شما برای {date} {status} شد.")
 
 def create_pdf_report(records, start_date, end_date):
-    start_shamsi = jdatetime.date.fromgregorian(date=datetime.fromisoformat(start_date).date()).strftime("%Y/%m/%d")
+    start_shamsi = jdatetime.date.fromgregorian(date=start_date.date()).strftime("%Y/%m/%d")
     end_shamsi = jdatetime.date.fromgregorian(date=datetime.fromisoformat(end_date).date()).strftime("%Y/%m/%d")
     pdfmetrics.registerFont(TTFont("Vazir", FONT_PATH))
     c = canvas.Canvas(PDF_REPORT)
