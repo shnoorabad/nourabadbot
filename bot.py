@@ -19,7 +19,8 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from pytz import timezone
 iran = timezone("Asia/Tehran")
-BOT_TOKEN = "866070292:AAFFfe42pTWHb-dbnW7mUbfkFiep1tYe80U"
+import os
+BOT_TOKEN = os.environ["BOT_TOKEN"]
 ADMIN_CHAT_ID = 123902504
 DB_FILE = "attendance.db"
 FONT_PATH = "./fonts/Vazir.ttf"
