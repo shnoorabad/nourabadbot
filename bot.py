@@ -97,11 +97,31 @@ def save_attendance(user_id, full_name, action, latitude, longitude):
 
 def upload_to_drive():
     creds = service_account.Credentials.from_service_account_file(
-        SERVICE_ACCOUNT_FILE, scopes=["https://www.googleapis.com/auth/drive.file"])
+        SERVICE_ACCOUNT_FILE, scopes=["https://www.googleapis.com/auth/drive"])
     service = build("drive", "v3", credentials=creds)
-    file_metadata = {"name": f"attendance_{datetime.now(iran).strftime('%Y-%m-%d_%H-%M')}.db"}
+
+    filename = "attendance1404.db"
+
+    # بررسی وجود فایل قبلی با همین نام
+    results = service.files().list(
+        q=f"name = '{filename}'",
+        fields="files(id)",
+        pageSize=1
+    ).execute()
+
+    items = results.get("files", [])
     media = MediaFileUpload(DB_FILE, mimetype="application/octet-stream")
-    service.files().create(body=file_metadata, media_body=media, fields="id").execute()
+
+    if items:
+        # اگر فایل قبلی وجود دارد، بروزرسانی کن
+        file_id = items[0]['id']
+        service.files().update(fileId=file_id, media_body=media).execute()
+        print("فایل قبلی در گوگل درایو بروزرسانی شد.")
+    else:
+        # اگر فایل وجود نداشت، فایل جدید ایجاد کن
+        file_metadata = {"name": filename}
+        service.files().create(body=file_metadata, media_body=media, fields="id").execute()
+        print("فایل جدید در گوگل درایو آپلود شد.")
 
 async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -284,6 +304,28 @@ async def ask_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_document(chat_id=user_id, document=open(PDF_REPORT, "rb"))
     await context.bot.send_document(chat_id=user_id, document=open(EXCEL_REPORT, "rb"))
     return ConversationHandler.END
+def download_from_drive(filename):
+    creds = service_account.Credentials.from_service_account_file(
+        SERVICE_ACCOUNT_FILE, scopes=["https://www.googleapis.com/auth/drive.readonly"])
+    service = build("drive", "v3", credentials=creds)
+
+    # جستجو برای فایل با نام خاص
+    results = service.files().list(
+        q="name = 'attendance1404.db'",
+        fields="files(id)",
+        pageSize=1
+    ).execute()
+
+    items = results.get('files', [])
+    if not items:
+        print("فایل attendance1404.db در گوگل درایو پیدا نشد.")
+        return
+
+    file_id = items[0]['id']
+    request = service.files().get_media(fileId=file_id)
+    with open(filename, "wb") as f:
+        f.write(request.execute())
+    print("فایل attendance1404.db با موفقیت دانلود شد.")
 
 def main():
     try:
@@ -291,8 +333,6 @@ def main():
     except Exception as e:
         print("خطا در دانلود فایل از گوگل درایو:", e)
 
-    if not os.path.exists(DB_FILE):
-        init_db()
     if not os.path.exists(DB_FILE):
         init_db()
     global app
