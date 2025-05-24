@@ -193,25 +193,26 @@ async def report_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"تاریخ شروع را وارد کنید (مثلاً {today}):")
     return ASK_START
 
-async def ask_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    admin_report_requests[update.effective_user.id] = {"start": update.message.text}
-    await update.message.reply_text("تاریخ پایان را وارد کنید:")
-    return ASK_END
+‏async def ask_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+‏    admin_report_requests[update.effective_user.id] = {"start": update.message.text}
+‏    await update.message.reply_text("تاریخ پایان را وارد کنید:")
+‏    return ASK_END
 
-async def ask_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    start = shamsi_to_miladi(admin_report_requests[user_id]["start"])
-    end = shamsi_to_miladi(update.message.text.strip())
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute("SELECT full_name, action, latitude, longitude, timestamp FROM attendance WHERE DATE(timestamp) BETWEEN ? AND ?", (start, end))
-    records = cursor.fetchall()
-    conn.close()
-    create_pdf_report(records, start, end)
-    create_excel_report(records)
-    await context.bot.send_document(chat_id=user_id, document=open(PDF_REPORT, "rb"))
-    await context.bot.send_document(chat_id=user_id, document=open(EXCEL_REPORT, "rb"))
-    return ConversationHandler.END
+‏async def ask_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
+‏    user_id = update.effective_user.id
+‏    start = shamsi_to_miladi(admin_report_requests[user_id]["start"])
+‏    end = shamsi_to_miladi(update.message.text.strip())
+‏    conn = sqlite3.connect(DB_FILE)
+‏    cursor = conn.cursor()
+‏    cursor.execute("SELECT full_name, action, latitude, longitude, timestamp FROM attendance WHERE DATE(timestamp) BETWEEN ? AND ?", (start, end))
+‏    records = cursor.fetchall()
+‏    conn.close()
+‏    create_pdf_report(records, start, end)
+‏    create_excel_report(records)
+‏    await context.bot.send_document(chat_id=user_id, document=open(PDF_REPORT, "rb"))
+‏    await context.bot.send_document(chat_id=user_id, document=open(EXCEL_REPORT, "rb"))
+‏    return ConversationHandler.END
+
 
 def main():
     if not os.path.exists(DB_FILE):
