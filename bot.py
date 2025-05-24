@@ -1,4 +1,4 @@
-fro‏m telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 ‏from telegram.ext import (
 ‏    ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters,
 ‏    ConversationHandler, CallbackQueryHandler
