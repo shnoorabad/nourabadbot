@@ -94,7 +94,7 @@ def upload_to_drive():
     creds = service_account.Credentials.from_service_account_file(
         SERVICE_ACCOUNT_FILE, scopes=["https://www.googleapis.com/auth/drive.file"])
     service = build("drive", "v3", credentials=creds)
-    file_metadata = {"name": f"attendance_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.db"}
+    file_metadata = {"name": f"attendance_{datetime.now(iran).strftime('%Y-%m-%d_%H-%M')}.db"}
     media = MediaFileUpload(DB_FILE, mimetype="application/octet-stream")
     service.files().create(body=file_metadata, media_body=media, fields="id").execute()
 
