@@ -183,6 +183,10 @@ async def ask_leave_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conn.close()
         await update.message.reply_text("درخواست شما ثبت شد و در انتظار تأیید ادمین است.")
         await send_leave_request_to_admin(user_id, full_name, "روزانه", context.user_data["date"])
+        keyboard = [[KeyboardButton("ثبت حضور", request_location=True)], [KeyboardButton("درخواست مرخصی")]]
+        if update.effective_user.id == ADMIN_CHAT_ID:
+           keyboard.append([KeyboardButton("گزارش‌گیری")])
+        await update.message.reply_text("یکی از گزینه‌ها را انتخاب کنید:", reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
         return ConversationHandler.END
     else:
         await update.message.reply_text("ساعت شروع و پایان را وارد کنید (مثلاً 09 تا 12):")
@@ -206,6 +210,10 @@ async def ask_leave_hours(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn.close()
     await update.message.reply_text("درخواست شما ثبت شد و در انتظار تأیید ادمین است.")
     await send_leave_request_to_admin(user_id, full_name, "ساعتی", date, start_hour, end_hour)
+    keyboard = [[KeyboardButton("ثبت حضور", request_location=True)], [KeyboardButton("درخواست مرخصی")]]
+    if update.effective_user.id == ADMIN_CHAT_ID:
+       keyboard.append([KeyboardButton("گزارش‌گیری")])
+    await update.message.reply_text("یکی از گزینه‌ها را انتخاب کنید:", reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
     return ConversationHandler.END
 async def handle_approval(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
