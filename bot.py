@@ -194,25 +194,14 @@ async def report_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ASK_START
 
 async def ask_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    shamsi = update.message.text.strip()
-    try:
-        miladi = shamsi_to_miladi(shamsi)
-        admin_report_requests[update.effective_user.id] = {"start": shamsi}
-        await update.message.reply_text("تاریخ پایان را وارد کنید:")
-        return ASK_END
-    except:
-        await update.message.reply_text("تاریخ نامعتبر است. لطفاً با فرمت صحیح مانند ۱۴۰۳/۰۳/۰۵ وارد کنید:")
-        return ASK_START
+    admin_report_requests[update.effective_user.id] = {"start": update.message.text}
+    await update.message.reply_text("تاریخ پایان را وارد کنید:")
+    return ASK_END
 
 async def ask_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    try:
-        start = shamsi_to_miladi(admin_report_requests[user_id]["start"])
-        end = shamsi_to_miladi(update.message.text.strip())
-    except:
-        await update.message.reply_text("تاریخ پایان نامعتبر است. لطفاً دوباره وارد کنید (مثلاً ۱۴۰۳/۰۳/۱۰):")
-        return ASK_END
-
+    start = shamsi_to_miladi(admin_report_requests[user_id]["start"])
+    end = shamsi_to_miladi(update.message.text.strip())
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute("SELECT full_name, action, latitude, longitude, timestamp FROM attendance WHERE DATE(timestamp) BETWEEN ? AND ?", (start, end))
