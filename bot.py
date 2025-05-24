@@ -273,8 +273,9 @@ def create_excel_report(records):
             t2 = datetime.fromisoformat(outs[i][4])
             delta = (t2 - t1).total_seconds()
             total += delta
-            ws.append([name, date, "ورود", t1.strftime("%H:%M"), f"{ins[i][2]:.5f},{ins[i][3]:.5f}", ""])
-            ws.append(["", "", "خروج", t2.strftime("%H:%M"), f"{outs[i][2]:.5f},{outs[i][3]:.5f}", round(delta / 3600, 2)])
+            date_shamsi = jdatetime.date.fromgregorian(date=datetime.fromisoformat(date).date()).strftime("%Y/%m/%d")
+            ws.append([name, date_shamsi, "ورود", t1.strftime("%H:%M"), f"{ins[i][2]:.5f},{ins[i][3]:.5f}", ""])
+            ws.append(["", date_shamsi, "خروج", t2.strftime("%H:%M"), f"{outs[i][2]:.5f},{outs[i][3]:.5f}", round(delta / 3600, 2)])
         ws.append(["", "", "", "", "جمع کل:", round(total / 3600, 2)])
         ws.append([])
     wb.save(EXCEL_REPORT)
