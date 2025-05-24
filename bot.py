@@ -1,3 +1,30 @@
+import sqlite3
+import os
+
+DB_FILE = "attendance.db"
+
+def initialize_database():
+    if not os.path.exists(DB_FILE):
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS attendance (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                action TEXT NOT NULL,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                latitude REAL,
+                longitude REAL
+            )
+        ''')
+        conn.commit()
+        conn.close()
+        print("Database and table created successfully.")
+    else:
+        print("Database already exists.")
+
+# اجرای تابع راه‌اندازی دیتابیس
+initialize_database()
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters,
