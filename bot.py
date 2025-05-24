@@ -86,7 +86,7 @@ def save_attendance(user_id, full_name, action, latitude, longitude):
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute("INSERT INTO attendance (user_id, full_name, action, latitude, longitude, timestamp) VALUES (?, ?, ?, ?, ?, ?)",
-                   (user_id, full_name, action, latitude, longitude, datetime.now().isoformat()))
+                   (user_id, full_name, action, latitude, longitude, datetime.now(iran).isoformat()))
     conn.commit()
     conn.close()
 
@@ -106,7 +106,7 @@ async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"{action} شما ثبت شد.")
     await context.bot.send_message(
         chat_id=ADMIN_CHAT_ID,
-        text=f"{user.full_name} - {action}\nموقعیت: https://maps.google.com/?q={location.latitude},{location.longitude}\nزمان: {datetime.now().isoformat()}"
+        text=f"{user.full_name} - {action}\nموقعیت: https://maps.google.com/?q={location.latitude},{location.longitude}\nزمان: {datetime.now(iran).isoformat()}"
     )
     upload_to_drive()
 
