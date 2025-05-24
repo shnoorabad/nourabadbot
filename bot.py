@@ -159,8 +159,8 @@ async def request_leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def ask_leave_type(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     if text not in ["ساعتی", "روزانه"]:
-        await update.message.reply_text("لطفاً فقط 'ساعتی' یا 'روزانه' وارد کنید.")
-        return ASK_LEAVE_TYPE
+
+    return ASK_LEAVE_TYPE
     context.user_data["leave_type"] = text
     today = get_today_shamsi()
     await update.message.reply_text(
