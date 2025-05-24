@@ -156,7 +156,9 @@ async def ask_leave_type(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ASK_LEAVE_TYPE
     context.user_data["leave_type"] = text
     today = get_today_shamsi()
-    await update.message.reply_text(f"تاریخ مرخصی را وارد کنید (مثلاً {today}):")
+    await update.message.reply_text(
+        f"تاریخ مرخصی را وارد کنید :\n`{today}`",
+        parse_mode="Markdown"
     return ASK_LEAVE_DATE
 
 async def ask_leave_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
