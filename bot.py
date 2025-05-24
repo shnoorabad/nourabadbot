@@ -1,24 +1,23 @@
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import (
 ‏    ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters,
-‏    ConversationHandler, CallbackQueryHandler
-)
-‏import sqlite3
-‏from datetime import datetime
-‏import os
-‏import jdatetime
-‏from collections import defaultdict
-‏from openpyxl import Workbook
-‏from reportlab.pdfgen import canvas
-‏from reportlab.pdfbase.ttfonts import TTFont
-‏from reportlab.pdfbase import pdfmetrics
-‏from bidi.algorithm import get_display
-‏import arabic_reshaper
-‏from google.oauth2 import service_account
-‏from googleapiclient.discovery import build
-‏from googleapiclient.http import MediaFileUpload
+‏    ConversationHandler, CallbackQueryHandler)
+import sqlite3
+from datetime import datetime
+import os
+import jdatetime
+from collections import defaultdict
+from openpyxl import Workbook
+from reportlab.pdfgen import canvas
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfbase import pdfmetrics
+from bidi.algorithm import get_display
+import arabic_reshaper
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload
 
-‏BOT_TOKEN = "866070292:AAFFfe42pTWHb-dbnW7mUbfkFiep1tYe80U"
+BOT_TOKEN = "866070292:AAFFfe42pTWHb-dbnW7mUbfkFiep1tYe80U"
 ‏ADMIN_CHAT_ID = 123902504
 ‏DB_FILE = "attendance.db"
 ‏FONT_PATH = "./fonts/Vazir.ttf"
@@ -309,4 +308,3 @@ from telegram.ext import (
     ))
 ‏    app.run_polling()
 ‏if __name__ == "__main__":
-‏    main()
