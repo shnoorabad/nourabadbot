@@ -217,11 +217,13 @@ async def handle_approval(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await app.bot.send_message(chat_id=int(user_id), text=f"درخواست مرخصی شما برای {date} {status} شد.")
 
 def create_pdf_report(records, start_date, end_date):
+    start_shamsi = jdatetime.date.fromgregorian(date=datetime.fromisoformat(start_date).date()).strftime("%Y/%m/%d")
+    end_shamsi = jdatetime.date.fromgregorian(date=datetime.fromisoformat(end_date).date()).strftime("%Y/%m/%d")
     pdfmetrics.registerFont(TTFont("Vazir", FONT_PATH))
     c = canvas.Canvas(PDF_REPORT)
     c.setFont("Vazir", 14)
     y = 800
-    c.drawRightString(550, y, reshape(f"گزارش حضور از {start_date} تا {end_date}"))
+    c.drawRightString(550, y, reshape(f"گزارش حضور از {start_shamsi} تا {end_shamsi}"))
     y -= 30
 
     grouped = defaultdict(list)
@@ -237,7 +239,8 @@ def create_pdf_report(records, start_date, end_date):
             total += (outs[i] - ins[i]).total_seconds()
         total_hours = round(total / 3600, 2)
 
-        c.drawRightString(550, y, reshape(f"{name} - {date}"))
+        date_shamsi = jdatetime.date.fromgregorian(date=datetime.fromisoformat(date).date()).strftime("%Y/%m/%d")
+        c.drawRightString(550, y, reshape(f"{name} - {date_shamsi}"))
         y -= 20
         for r in actions:
             t = datetime.fromisoformat(r[4])
