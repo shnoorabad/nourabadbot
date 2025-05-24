@@ -90,10 +90,38 @@ def upload_to_drive():
     creds = service_account.Credentials.from_service_account_file(
         SERVICE_ACCOUNT_FILE, scopes=["https://www.googleapis.com/auth/drive.file"])
     service = build("drive", "v3", credentials=creds)
-    file_metadata = {"name": f"attendance_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.db"}
-    media = MediaFileUpload(DB_FILE, mimetype="application/octet-stream")
-    service.files().create(body=file_metadata, media_body=media, fields="id").execute()
 
+    # بررسی اینکه فایل attendance.db قبلاً در درایو وجود دارد یا نه
+    results = service.files().list(q="name='attendance.db'", fields="files(id)").execute()
+    items = results.get("files", [])
+
+    media = MediaFileUpload(DB_FILE, mimetype="application/octet-stream")
+
+    if items:
+        file_id = items[0]["id"]
+        # اگر وجود دارد، به‌روزرسانی شود
+        service.files().update(fileId=file_id, media_body=media).execute()
+    else:
+        # اگر وجود ندارد، ساخته شود
+        file_metadata = {"name": "attendance.db"}
+        service.files().create(body=file_metadata, media_body=media).execute()
+def download_from_drive(filename):
+    creds = service_account.Credentials.from_service_account_file(
+        SERVICE_ACCOUNT_FILE, scopes=["https://www.googleapis.com/auth/drive.readonly"])
+    service = build("drive", "v3", credentials=creds)
+
+    results = service.files().list(q="name='attendance.db'", fields="files(id)").execute()
+    items = results.get('files', [])
+
+    if not items:
+        print("فایل attendance.db در گوگل درایو یافت نشد.")
+        return
+
+    file_id = items[0]['id']
+    request = service.files().get_media(fileId=file_id)
+    with open(filename, "wb") as f:
+        f.write(request.execute())
+    print("فایل attendance.db با موفقیت از گوگل درایو دانلود شد.")
 async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     location = update.message.location
@@ -281,6 +309,7 @@ async def ask_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 def main():
+    download_from_drive(DB_FILE)
     if not os.path.exists(DB_FILE):
         init_db()
     global app
