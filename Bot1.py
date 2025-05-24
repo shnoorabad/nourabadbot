@@ -75,9 +75,14 @@ def init_db():
     conn.commit()
     conn.close()
 def get_next_action(user_id):
+    today = datetime.now(iran).date().isoformat()
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    cursor.execute("SELECT action FROM attendance WHERE user_id = ? ORDER BY timestamp DESC LIMIT 1", (user_id,))
+    cursor.execute("""
+        SELECT action FROM attendance 
+        WHERE user_id = ? AND DATE(timestamp) = ? 
+        ORDER BY timestamp DESC LIMIT 1
+    """, (user_id, today))
     row = cursor.fetchone()
     conn.close()
     return "خروج" if row and row[0] == "ورود" else "ورود"
@@ -281,6 +286,13 @@ async def ask_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 def main():
+    try:
+        download_from_drive(DB_FILE)
+    except Exception as e:
+        print("خطا در دانلود فایل از گوگل درایو:", e)
+
+    if not os.path.exists(DB_FILE):
+        init_db()
     if not os.path.exists(DB_FILE):
         init_db()
     global app
@@ -309,6 +321,3 @@ def main():
     ))
 
     app.run_polling()
-
-if __name__ == "__main__":
-    main()
