@@ -323,7 +323,7 @@ async def ask_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     start = shamsi_to_miladi(admin_report_requests[user_id]["start"])
     end = shamsi_to_miladi(update.message.text.strip())
-    if not start or not end:
+if not start or not end:
     await update.message.reply_text("تاریخ شروع یا پایان معتبر نیست.")
     return ConversationHandler.END
     conn = sqlite3.connect(DB_FILE)
