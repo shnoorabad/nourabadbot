@@ -282,7 +282,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def report_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     today = get_today_shamsi()
-    await update.message.reply_text(f"تاریخ شروع را وارد کنید (مثلاً {today}):")
+    await update.message.reply_text(
+    f"تاریخ شروع را وارد کنید :\n`{get_today_shamsi()}`",
+    parse_mode="Markdown"
+)
     return ASK_START
 
 async def ask_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
