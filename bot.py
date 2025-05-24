@@ -281,7 +281,6 @@ async def ask_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 def main():
-    def main():
     try:
         download_from_drive(DB_FILE)
     except Exception as e:
