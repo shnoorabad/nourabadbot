@@ -220,7 +220,7 @@ async def handle_approval(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     data = query.data
     action, user_id, date = data.split("_", 2)
-    status = "تأیید شد" if action == "approve" else "رد شد"
+    status = "تأیید " if action == "approve" else "رد "
 
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
