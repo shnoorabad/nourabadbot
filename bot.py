@@ -17,7 +17,6 @@ import arabic_reshaper
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
-
 BOT_TOKEN = "866070292:AAFFfe42pTWHb-dbnW7mUbfkFiep1tYe80U"
 ADMIN_CHAT_ID = 123902504
 DB_FILE = "attendance.db"
