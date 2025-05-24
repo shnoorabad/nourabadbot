@@ -76,14 +76,18 @@ def init_db():
     conn.commit()
     conn.close()
 def get_next_action(user_id):
-    today = datetime.now(iran).date().isoformat()
+    iran = pytz.timezone("Asia/Tehran")
+    today = datetime.now(iran).date()
+    start_time = datetime.combine(today, time(0, 0)).isoformat()
+    end_time = datetime.combine(today, time(23, 59, 59)).isoformat()
+
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT action FROM attendance 
-        WHERE user_id = ? AND DATE(timestamp) = ? 
+        SELECT action FROM attendance
+        WHERE user_id = ? AND timestamp BETWEEN ? AND ?
         ORDER BY timestamp DESC LIMIT 1
-    """, (user_id, today))
+    """, (user_id, start_time, end_time))
     row = cursor.fetchone()
     conn.close()
     return "خروج" if row and row[0] == "ورود" else "ورود"
