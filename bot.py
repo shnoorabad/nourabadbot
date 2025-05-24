@@ -17,6 +17,7 @@ import arabic_reshaper
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
+
 BOT_TOKEN = "866070292:AAFFfe42pTWHb-dbnW7mUbfkFiep1tYe80U"
 ADMIN_CHAT_ID = 123902504
 DB_FILE = "attendance.db"
@@ -69,7 +70,7 @@ def init_db():
     """)
     conn.commit()
     conn.close()
-        def get_next_action(user_id):
+def get_next_action(user_id):
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute("SELECT action FROM attendance WHERE user_id = ? ORDER BY timestamp DESC LIMIT 1", (user_id,))
