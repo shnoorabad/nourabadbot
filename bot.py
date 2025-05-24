@@ -37,7 +37,7 @@ def reshape(text):
     return get_display(arabic_reshaper.reshape(text))
 
 def get_today_shamsi():
-    return jdatetime.datetime.fromgregorian(datetime=datetime.now()).strftime("%Y/%m/%d")
+    return jdatetime.datetime.fromgregorian(datetime=datetime.now(iran)).strftime("%Y/%m/%d")
 
 def shamsi_to_miladi(shamsi_date):
     try:
@@ -174,7 +174,7 @@ async def ask_leave_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data["leave_type"] == "روزانه":
         full_name = update.effective_user.full_name
         user_id = update.effective_user.id
-        now = datetime.now().isoformat()
+        now = datetime.now(iran).isoformat()
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
         cursor.execute("INSERT INTO leave_requests (user_id, full_name, leave_type, date, submitted_at) VALUES (?, ?, ?, ?, ?)",
@@ -201,7 +201,7 @@ async def ask_leave_hours(update: Update, context: ContextTypes.DEFAULT_TYPE):
     full_name = update.effective_user.full_name
     user_id = update.effective_user.id
     date = context.user_data["date"]
-    now = datetime.now().isoformat()
+    now = datetime.now(iran).isoformat()
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute("INSERT INTO leave_requests (user_id, full_name, leave_type, date, start_hour, end_hour, submitted_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
