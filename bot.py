@@ -17,8 +17,8 @@ import arabic_reshaper
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
-from pytz import timezone
-iran = timezone("Asia/Tehran")
+import pytz
+iran = pytz.timezone("Asia/Tehran")
 import os
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 ADMIN_CHAT_ID = 123902504
@@ -76,7 +76,7 @@ def init_db():
     conn.commit()
     conn.close()
 def get_next_action(user_id):
-    iran = pytz.timezone("Asia/Tehran")
+    
     today = datetime.now(iran).date()
     start_time = datetime.combine(today, time(0, 0)).isoformat()
     end_time = datetime.combine(today, time(23, 59, 59)).isoformat()
