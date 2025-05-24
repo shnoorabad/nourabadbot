@@ -325,8 +325,14 @@ async def ask_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
     end = shamsi_to_miladi(update.message.text.strip())
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    cursor.execute("SELECT full_name, action, latitude, longitude, timestamp FROM attendance WHERE DATE(timestamp) BETWEEN ? AND ?", (start, end))
-    records = cursor.fetchall()
+    start_datetime = datetime.combine(start, time(0, 0)).isoformat()
+    end_datetime = datetime.combine(end, time(23, 59, 59)).isoformat()
+
+    cursor.execute("""
+    SELECT full_name, action, latitude, longitude, timestamp FROM attendance
+    WHERE timestamp BETWEEN ? AND ?
+""", (start_datetime, end_datetime))
+records = cursor.fetchall()
     conn.close()
     create_pdf_report(records, start, end)
     create_excel_report(records)
