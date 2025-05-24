@@ -331,8 +331,8 @@ async def ask_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cursor.execute("""
     SELECT full_name, action, latitude, longitude, timestamp FROM attendance
     WHERE timestamp BETWEEN ? AND ?
-""", (start_datetime, end_datetime))
-records = cursor.fetchall()
+    """, (start_datetime, end_datetime))
+    records = cursor.fetchall()
     conn.close()
     create_pdf_report(records, start, end)
     create_excel_report(records)
