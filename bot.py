@@ -145,9 +145,15 @@ async def send_leave_request_to_admin(user_id, full_name, leave_type, date, star
          InlineKeyboardButton("رد", callback_data=f"reject_{user_id}_{date}")]
     ])
     await app.bot.send_message(chat_id=ADMIN_CHAT_ID, text=text, reply_markup=buttons)
+from telegram import ReplyKeyboardMarkup, KeyboardButton
+
 async def request_leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    today = get_today_shamsi()
-    await update.message.reply_text(f"نوع مرخصی را وارد کنید (ساعتی یا روزانه):")
+    keyboard = ReplyKeyboardMarkup(
+        [[KeyboardButton("ساعتی")], [KeyboardButton("روزانه")]],
+        resize_keyboard=True,
+        one_time_keyboard=True
+    )
+    await update.message.reply_text("نوع مرخصی را انتخاب کنید:", reply_markup=keyboard)
     return ASK_LEAVE_TYPE
 
 async def ask_leave_type(update: Update, context: ContextTypes.DEFAULT_TYPE):
