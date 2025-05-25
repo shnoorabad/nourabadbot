@@ -268,6 +268,7 @@ def create_pdf_report(records, start_date, end_date):
         y -= 30
         if y < 50:
             c.showPage()
+            c.setFont("Vazir", 14)
             y = 800
     c.save()
 def create_excel_report(records):
@@ -278,23 +279,37 @@ def create_excel_report(records):
 
     grouped = defaultdict(list)
     for r in records:
-        key = (r[0], r[4][:10])
+        key = (r[0], r[4][:10])  # (نام, تاریخ)
         grouped[key].append(r)
 
-    for (name, date), actions in grouped.items():
+    for (name, date_str), actions in grouped.items():
         ins = [r for r in actions if r[1] == "ورود"]
         outs = [r for r in actions if r[1] == "خروج"]
         total = 0
+
+        try:
+            date_g = datetime.fromisoformat(date_str).date()
+            date_shamsi = jdatetime.date.fromgregorian(date=date_g).strftime("%Y/%m/%d")
+        except:
+            date_shamsi = date_str  # fallback
+
         for i in range(min(len(ins), len(outs))):
             t1 = datetime.fromisoformat(ins[i][4])
             t2 = datetime.fromisoformat(outs[i][4])
             delta = (t2 - t1).total_seconds()
+
+            if delta <= 0:
+                continue  # پرش از جفت‌های نامعتبر (مثلاً خروج زودتر از ورود)
+
             total += delta
-            date_shamsi = jdatetime.date.fromgregorian(date=datetime.fromisoformat(date).date()).strftime("%Y/%m/%d")
+
             ws.append([name, date_shamsi, "ورود", t1.strftime("%H:%M"), f"{ins[i][2]:.5f},{ins[i][3]:.5f}", ""])
             ws.append(["", date_shamsi, "خروج", t2.strftime("%H:%M"), f"{outs[i][2]:.5f},{outs[i][3]:.5f}", round(delta / 3600, 2)])
-        ws.append(["", "", "", "", "جمع کل:", round(total / 3600, 2)])
-        ws.append([])
+
+        if total > 0:
+            ws.append(["", "", "", "", "جمع کل:", round(total / 3600, 2)])
+            ws.append([])
+
     wb.save(EXCEL_REPORT)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
