@@ -291,33 +291,54 @@ def create_pdf_report(records, start_date, end_date):
     c.drawRightString(550, y, reshape(f"گزارش حضور از {start_shamsi} تا {end_shamsi}"))
     y -= 30
 
-    grouped = defaultdict(list)
+    from collections import defaultdict
+    user_records = defaultdict(list)
     for row in records:
-        key = (row[0], row[4][:10])
-        grouped[key].append(row)
+        user_records[row[0]].append(row)
 
-    for (name, date), actions in grouped.items():
+    for name, recs in user_records.items():
         total = 0
-        ins = [datetime.fromisoformat(r[4]) for r in actions if r[1] == "ورود"]
-        outs = [datetime.fromisoformat(r[4]) for r in actions if r[1] == "خروج"]
-        for i in range(min(len(ins), len(outs))):
-            total += (outs[i] - ins[i]).total_seconds()
-        total_hours = round(total / 3600, 2)
+        recs.sort(key=lambda x: x[4])  # مرتب‌سازی بر اساس زمان
 
-        date_shamsi = jdatetime.date.fromgregorian(date=datetime.fromisoformat(date).date()).strftime("%Y/%m/%d")
-        c.drawRightString(550, y, reshape(f"{name} - {date_shamsi}"))
-        y -= 20
-        for r in actions:
+        c.setFont("Vazir", 13)
+        c.drawRightString(550, y, reshape(f"نام: {name}"))
+        y -= 25
+
+        entries = []
+        exits = []
+
+        for r in recs:
             t = datetime.fromisoformat(r[4])
-            line = f"{r[1]} | {t.strftime('%H:%M')} | مختصات: {r[2]:.5f}, {r[3]:.5f}"
+            date_shamsi = jdatetime.date.fromgregorian(date=t.date()).strftime("%Y/%m/%d")
+            time_str = t.strftime("%H:%M")
+            line = f"{date_shamsi} | {r[1]} | {time_str} | مختصات: {r[2]:.5f}, {r[3]:.5f}"
+            c.setFont("Vazir", 11)
             c.drawRightString(550, y, reshape(line))
-            y -= 20
-        c.drawRightString(550, y, reshape(f"جمع کل: {total_hours} ساعت"))
-        y -= 30
+            y -= 18
+
+            if r[1] == "ورود":
+                entries.append(t)
+            elif r[1] == "خروج":
+                exits.append(t)
+
+            if y < 50:
+                c.showPage()
+                c.setFont("Vazir", 14)
+                y = 800
+
+        for i in range(min(len(entries), len(exits))):
+            total += (exits[i] - entries[i]).total_seconds()
+
+        total_hours = round(total / 3600, 2)
+        c.setFont("Vazir", 12)
+        c.drawRightString(550, y, reshape(f"⏱ مجموع ساعات حضور: {total_hours} ساعت"))
+        y -= 40
+
         if y < 50:
             c.showPage()
             c.setFont("Vazir", 14)
             y = 800
+
     c.save()
 def create_excel_report(records):
     wb = Workbook()
