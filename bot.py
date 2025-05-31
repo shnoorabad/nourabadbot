@@ -149,16 +149,23 @@ async def send_leave_request_to_admin(user_id, full_name, leave_type, date, star
     text = f"درخواست مرخصی جدید:\nنام: {full_name}\nنوع: {leave_type}\nتاریخ: {date}"
     if leave_type == "ساعتی":
         text += f"\nساعت: {start_hour} تا {end_hour}"
+
+    callback_approve = f"approve_{user_id}_{date}_{start_hour}_{end_hour}_{leave_type}"
+    callback_reject = f"reject_{user_id}_{date}_{start_hour}_{end_hour}_{leave_type}"
+
     buttons = InlineKeyboardMarkup([
-        [InlineKeyboardButton("تأیید", callback_data=f"approve_{user_id}_{date}"),
-         InlineKeyboardButton("رد", callback_data=f"reject_{user_id}_{date}")]
+        [
+            InlineKeyboardButton("تأیید", callback_data=callback_approve),
+            InlineKeyboardButton("رد", callback_data=callback_reject)
+        ]
     ])
+
     for admin_id in ADMIN_CHAT_IDS:
         await app.bot.send_message(
-    chat_id=admin_id,
-    text=text,
-    reply_markup=buttons
-)
+            chat_id=admin_id,
+            text=text,
+            reply_markup=buttons
+        )
 from telegram import ReplyKeyboardMarkup, KeyboardButton
 
 async def request_leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
