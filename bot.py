@@ -297,41 +297,65 @@ def create_pdf_report(records, start_date, end_date):
         user_records[row[0]].append(row)
 
     for name, recs in user_records.items():
-        total = 0
+        total_all = 0
         recs.sort(key=lambda x: x[4])  # مرتب‌سازی بر اساس زمان
 
         c.setFont("Vazir", 13)
         c.drawRightString(550, y, reshape(f"نام: {name}"))
         y -= 25
 
-        entries = []
-        exits = []
-
+        # گروه‌بندی بر اساس تاریخ میلادی
+        daily_records = defaultdict(list)
         for r in recs:
-            t = datetime.fromisoformat(r[4])
-            date_shamsi = jdatetime.date.fromgregorian(date=t.date()).strftime("%Y/%m/%d")
-            time_str = t.strftime("%H:%M")
-            line = f"{date_shamsi} | {r[1]} | {time_str} | مختصات: {r[2]:.5f}, {r[3]:.5f}"
-            c.setFont("Vazir", 11)
-            c.drawRightString(550, y, reshape(line))
-            y -= 18
+            day = r[4][:10]  # YYYY-MM-DD
+            daily_records[day].append(r)
 
-            if r[1] == "ورود":
-                entries.append(t)
-            elif r[1] == "خروج":
-                exits.append(t)
+        for date, day_records in sorted(daily_records.items()):
+            entries = []
+            exits = []
+            date_obj = datetime.fromisoformat(date)
+            date_shamsi = jdatetime.date.fromgregorian(date=date_obj.date()).strftime("%Y/%m/%d")
+            c.setFont("Vazir", 12)
+            c.drawRightString(550, y, reshape(f"📅 تاریخ: {date_shamsi}"))
+            y -= 20
+
+            for r in day_records:
+                t = datetime.fromisoformat(r[4])
+                time_str = t.strftime("%H:%M")
+                line = f"{r[1]} | {time_str} | مختصات: {r[2]:.5f}, {r[3]:.5f}"
+                c.setFont("Vazir", 11)
+                c.drawRightString(550, y, reshape(line))
+                y -= 18
+
+                if r[1] == "ورود":
+                    entries.append(t)
+                elif r[1] == "خروج":
+                    exits.append(t)
+
+                if y < 50:
+                    c.showPage()
+                    c.setFont("Vazir", 14)
+                    y = 800
+
+            # محاسبه زمان حضور در این روز
+            total_day = 0
+            for i in range(min(len(entries), len(exits))):
+                total_day += (exits[i] - entries[i]).total_seconds()
+
+            total_day_hours = round(total_day / 3600, 2)
+            total_all += total_day  # جمع تمام روزها
+            c.setFont("Vazir", 11)
+            c.drawRightString(550, y, reshape(f"⏱ حضور این روز: {total_day_hours} ساعت"))
+            y -= 25
 
             if y < 50:
                 c.showPage()
                 c.setFont("Vazir", 14)
                 y = 800
 
-        for i in range(min(len(entries), len(exits))):
-            total += (exits[i] - entries[i]).total_seconds()
-
-        total_hours = round(total / 3600, 2)
+        total_all_hours = round(total_all / 3600, 2)
         c.setFont("Vazir", 12)
-        c.drawRightString(550, y, reshape(f"⏱ مجموع ساعات حضور: {total_hours} ساعت"))
+        c.drawRightString(550, y, reshape(f"🔸 مجموع کل حضور: {total_all_hours} ساعت"))
         y -= 40
 
         if y < 50:
