@@ -128,18 +128,21 @@ async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     location = update.message.location
     action = get_next_action(user.id)
+
     save_attendance(user.id, user.full_name, action, location.latitude, location.longitude)
     await update.message.reply_text(f"{action} شما ثبت شد.") 
+
     for admin_id in ADMIN_CHAT_IDS:
         await context.bot.send_message(
-        chat_id=admin_id,
-        text=f"{user.full_name} – {action}\n..."
+            chat_id=admin_id,
+            text=f"{user.full_name} – {action}\nموقعیت: https://maps.google.com/?q={location.latitude},{location.longitude}\nزمان: {datetime.now(iran).strftime('%Y-%m-%d %H:%M:%S')}"
         )
         await context.bot.send_location(
-        chat_id=admin_id,
-        latitude=location.latitude,
-        longitude=location.longitude
+            chat_id=admin_id,
+            latitude=location.latitude,
+            longitude=location.longitude
         )
+
     upload_to_drive()
 
 async def send_leave_request_to_admin(user_id, full_name, leave_type, date, start_hour="", end_hour=""):
