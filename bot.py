@@ -337,6 +337,7 @@ def create_pdf_report(records, start_date, end_date):
             c.setFont("Vazir", 14)
             y = 800
     c.save()
+    
 def create_excel_report(records):
     from openpyxl import Workbook
     from datetime import datetime
