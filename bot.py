@@ -370,37 +370,56 @@ def create_excel_report(records):
     ws.title = "Attendance"
     ws.append(["نام", "تاریخ", "ورود/خروج", "ساعت", "مختصات", "مدت (ساعت)"])
 
-    grouped = defaultdict(list)
+    from collections import defaultdict
+
+    user_records = defaultdict(list)
     for r in records:
-        key = (r[0], r[4][:10])  # (نام, تاریخ)
-        grouped[key].append(r)
+        user_records[r[0]].append(r)
 
-    for (name, date_str), actions in grouped.items():
-        ins = [r for r in actions if r[1] == "ورود"]
-        outs = [r for r in actions if r[1] == "خروج"]
-        total = 0
+    for name, recs in user_records.items():
+        # مرتب‌سازی همه رکوردهای کاربر بر اساس زمان
+        recs.sort(key=lambda x: x[4])
+        ws.append([f"نام کاربر: {name}"])
+        total_all = 0
 
-        try:
-            date_g = datetime.fromisoformat(date_str).date()
-            date_shamsi = jdatetime.date.fromgregorian(date=date_g).strftime("%Y/%m/%d")
-        except:
-            date_shamsi = date_str  # fallback
+        # گروه‌بندی به‌صورت (تاریخ، لیست رکوردها)
+        daily_records = defaultdict(list)
+        for r in recs:
+            day = r[4][:10]
+            daily_records[day].append(r)
 
-        for i in range(min(len(ins), len(outs))):
-            t1 = datetime.fromisoformat(ins[i][4])
-            t2 = datetime.fromisoformat(outs[i][4])
-            delta = (t2 - t1).total_seconds()
+        for date_str, day_actions in sorted(daily_records.items()):
+            ins = [r for r in day_actions if r[1] == "ورود"]
+            outs = [r for r in day_actions if r[1] == "خروج"]
+            total_day = 0
 
-            if delta <= 0:
-                continue  # پرش از جفت‌های نامعتبر (مثلاً خروج زودتر از ورود)
+            try:
+                date_g = datetime.fromisoformat(date_str).date()
+                date_shamsi = jdatetime.date.fromgregorian(date=date_g).strftime("%Y/%m/%d")
+            except:
+                date_shamsi = date_str  # fallback
 
-            total += delta
+            for i in range(min(len(ins), len(outs))):
+                t1 = datetime.fromisoformat(ins[i][4])
+                t2 = datetime.fromisoformat(outs[i][4])
+                delta = (t2 - t1).total_seconds()
 
-            ws.append([name, date_shamsi, "ورود", t1.strftime("%H:%M"), f"{ins[i][2]:.5f},{ins[i][3]:.5f}", ""])
-            ws.append(["", date_shamsi, "خروج", t2.strftime("%H:%M"), f"{outs[i][2]:.5f},{outs[i][3]:.5f}", round(delta / 3600, 2)])
+                if delta <= 0:
+                    continue
 
-        if total > 0:
-            ws.append(["", "", "", "", "جمع کل:", round(total / 3600, 2)])
+                total_day += delta
+
+                ws.append([name, date_shamsi, "ورود", t1.strftime("%H:%M"), f"{ins[i][2]:.5f},{ins[i][3]:.5f}", ""])
+                ws.append(["", date_shamsi, "خروج", t2.strftime("%H:%M"), f"{outs[i][2]:.5f},{outs[i][3]:.5f}", round(delta / 3600, 2)])
+
+            if total_day > 0:
+                ws.append(["", "", "", "", "⏱ مجموع این روز:", round(total_day / 3600, 2)])
+                ws.append([])
+
+            total_all += total_day
+
+        if total_all > 0:
+            ws.append(["", "", "", "", "🔸 مجموع کل حضور کاربر:", round(total_all / 3600, 2)])
             ws.append([])
 
     wb.save(EXCEL_REPORT)
