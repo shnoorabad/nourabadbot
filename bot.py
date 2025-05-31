@@ -130,7 +130,7 @@ async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     action = get_next_action(user.id)
     save_attendance(user.id, user.full_name, action, location.latitude, location.longitude)
     await update.message.reply_text(f"{action} شما ثبت شد.")
-    for admin_id in ADMIN_CHAT_IDS:
+ for admin_id in ADMIN_CHAT_IDS:
     await context.bot.send_message(
         chat_id=admin_id,
         text=f"{user.full_name} – {action}\n..."
@@ -145,7 +145,7 @@ async def send_leave_request_to_admin(user_id, full_name, leave_type, date, star
         [InlineKeyboardButton("تأیید", callback_data=f"approve_{user_id}_{date}"),
          InlineKeyboardButton("رد", callback_data=f"reject_{user_id}_{date}")]
     ])
-    for admin_id in ADMIN_CHAT_IDS:
+ for admin_id in ADMIN_CHAT_IDS:
     await app.bot.send_message(chat_id=admin_id, text=..., reply_markup=...)
 from telegram import ReplyKeyboardMarkup, KeyboardButton
 
