@@ -299,7 +299,7 @@ def create_pdf_report(records, start_date, end_date):
 
     c.save()
     
-    def create_pdf_report(records, start_date, end_date):
+def create_pdf_report(records, start_date, end_date):
     start_dt = datetime.fromisoformat(start_date)
     end_dt = datetime.fromisoformat(end_date)
     start_shamsi = jdatetime.date.fromgregorian(date=start_dt.date()).strftime("%Y/%m/%d")
