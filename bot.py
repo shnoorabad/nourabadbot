@@ -131,9 +131,14 @@ async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     save_attendance(user.id, user.full_name, action, location.latitude, location.longitude)
     await update.message.reply_text(f"{action} شما ثبت شد.")
     for admin_id in ADMIN_CHAT_IDS:
-        await context.bot.send_message(
-        chat_id in ADMIN_CHAT_IDS,
+    await context.bot.send_message(
+        chat_id=admin_id,
         text=f"{user.full_name} – {action}\n..."
+    )
+    await context.bot.send_location(
+        chat_id=admin_id,
+        latitude=location.latitude,
+        longitude=location.longitude
     )
     upload_to_drive()
 
