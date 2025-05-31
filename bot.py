@@ -129,8 +129,8 @@ async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     location = update.message.location
     action = get_next_action(user.id)
     save_attendance(user.id, user.full_name, action, location.latitude, location.longitude)
-    await update.message.reply_text(f"{action} شما ثبت شد.")
-    for admin_id in ADMIN_CHAT_IDS:
+    await update.message.reply_text(f"{action} شما ثبت شد.") 
+for admin_id in ADMIN_CHAT_IDS:
     await context.bot.send_message(
         chat_id=admin_id,
         text=f"{user.full_name} – {action}\n..."
