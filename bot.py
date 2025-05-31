@@ -132,7 +132,7 @@ async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"{action} شما ثبت شد.")
     for admin_id in ADMIN_CHAT_IDS:
         await context.bot.send_message(
-        chat_id=admin_id,
+        chat_id in ADMIN_CHAT_IDS,
         text=f"{user.full_name} – {action}\n..."
     )
     upload_to_drive()
