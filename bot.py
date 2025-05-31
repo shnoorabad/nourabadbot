@@ -241,16 +241,43 @@ async def handle_approval(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     data = query.data
     action, user_id, date = data.split("_", 2)
-    status = "تأیید " if action == "approve" else "رد "
+    status = "تأیید شد ✅" if action == "approve" else "رد شد ❌"
 
+    # گرفتن نام کامل کاربر از تلگرام
+    user = await context.bot.get_chat(int(user_id))
+    full_name = user.full_name
+
+    # اتصال به دیتابیس و گرفتن اطلاعات مرخصی
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
+    cursor.execute(
+        "SELECT start_hour, end_hour, leave_type FROM leave_requests WHERE user_id = ? AND date = ?",
+        (user_id, date)
+    )
+    row = cursor.fetchone()
+
+    # بررسی وجود رکورد
+    if row:
+        start_hour, end_hour, leave_type = row
+    else:
+        start_hour = end_hour = leave_type = ""
+
+    # به‌روزرسانی وضعیت مرخصی
     cursor.execute("UPDATE leave_requests SET status = ? WHERE user_id = ? AND date = ?", (status, user_id, date))
     conn.commit()
     conn.close()
 
-    await query.edit_message_text(f"درخواست مربوط به {date} {status} شد.")
-    await app.bot.send_message(chat_id=int(user_id), text=f"درخواست مرخصی شما برای {date} {status} شد.")
+    # ساخت متن نهایی برای پیام
+    if leave_type == "ساعتی":
+        msg = f"درخواست مرخصی آقای {full_name} برای تاریخ {date} ساعت {start_hour} تا {end_hour} {status}"
+    else:
+        msg = f"درخواست مرخصی آقای {full_name} برای تاریخ {date} {status}"
+
+    # پیام برای ادمین
+    await query.edit_message_text(msg)
+
+    # پیام به کاربر
+    await app.bot.send_message(chat_id=int(user_id), text=f"درخواست مرخصی شما: {msg}")
 
 def create_pdf_report(records, start_date, end_date):
     start_dt = datetime.fromisoformat(start_date)
