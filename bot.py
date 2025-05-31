@@ -21,7 +21,7 @@ from pytz import timezone
 iran = timezone("Asia/Tehran")
 import os
 BOT_TOKEN = os.environ["BOT_TOKEN"]
-ADMIN_CHAT_ID = 123902504
+ADMIN_CHAT_IDS = [123902504, 1122334455, 6677889900]  # شناسه تلگرام مدیرها
 DB_FILE = "attendance.db"
 FONT_PATH = "./fonts/Vazir.ttf"
 PDF_REPORT = "attendance_report.pdf"
@@ -130,9 +130,10 @@ async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     action = get_next_action(user.id)
     save_attendance(user.id, user.full_name, action, location.latitude, location.longitude)
     await update.message.reply_text(f"{action} شما ثبت شد.")
+    for admin_id in ADMIN_CHAT_IDS:
     await context.bot.send_message(
-        chat_id=ADMIN_CHAT_ID,
-        text=f"{user.full_name} - {action}\nموقعیت: https://maps.google.com/?q={location.latitude},{location.longitude}\nزمان: {datetime.now(iran).isoformat()}"
+        chat_id=admin_id,
+        text=f"{user.full_name} – {action}\n..."
     )
     upload_to_drive()
 
@@ -144,7 +145,8 @@ async def send_leave_request_to_admin(user_id, full_name, leave_type, date, star
         [InlineKeyboardButton("تأیید", callback_data=f"approve_{user_id}_{date}"),
          InlineKeyboardButton("رد", callback_data=f"reject_{user_id}_{date}")]
     ])
-    await app.bot.send_message(chat_id=ADMIN_CHAT_ID, text=text, reply_markup=buttons)
+    for admin_id in ADMIN_CHAT_IDS:
+    await app.bot.send_message(chat_id=admin_id, text=..., reply_markup=...)
 from telegram import ReplyKeyboardMarkup, KeyboardButton
 
 async def request_leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -184,7 +186,7 @@ async def ask_leave_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("درخواست شما ثبت شد و در انتظار تأیید ادمین است.")
         await send_leave_request_to_admin(user_id, full_name, "روزانه", context.user_data["date"])
         keyboard = [[KeyboardButton("ثبت حضور", request_location=True)], [KeyboardButton("درخواست مرخصی")]]
-        if update.effective_user.id == ADMIN_CHAT_ID:
+        if update.effective_user.id in ADMIN_CHAT_IDS:
            keyboard.append([KeyboardButton("گزارش‌گیری")])
         await update.message.reply_text("یکی از گزینه‌ها را انتخاب کنید:", reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
         return ConversationHandler.END
@@ -211,7 +213,7 @@ async def ask_leave_hours(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("درخواست شما ثبت شد و در انتظار تأیید ادمین است.")
     await send_leave_request_to_admin(user_id, full_name, "ساعتی", date, start_hour, end_hour)
     keyboard = [[KeyboardButton("ثبت حضور", request_location=True)], [KeyboardButton("درخواست مرخصی")]]
-    if update.effective_user.id == ADMIN_CHAT_ID:
+    if update.effective_user.id in ADMIN_CHAT_IDS:
        keyboard.append([KeyboardButton("گزارش‌گیری")])
     await update.message.reply_text("یکی از گزینه‌ها را انتخاب کنید:", reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
     return ConversationHandler.END
@@ -313,7 +315,7 @@ def create_excel_report(records):
     wb.save(EXCEL_REPORT)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    is_admin = update.effective_user.id == ADMIN_CHAT_ID
+    is_admin = update.effective_user.id in ADMIN_CHAT_IDS
     keyboard = [[KeyboardButton("ثبت حضور", request_location=True)], [KeyboardButton("درخواست مرخصی")]]
     if is_admin:
         keyboard.append([KeyboardButton("گزارش‌گیری")])
