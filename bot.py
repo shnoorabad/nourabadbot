@@ -382,13 +382,14 @@ def create_excel_report(records):
         ws.append([name, "جمع کل", total_hours])
         ws.append([])
 
-    wb.save(EXCEL_REPORT)def create_excel_report(records):
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Attendance"
-    ws.append(["نام", "تاریخ", "ورود/خروج", "ساعت", "مختصات", "مدت (ساعت)"])
+    wb.save(EXCEL_REPORT)
+    def create_excel_report(records):
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Attendance"
+        ws.append(["نام", "تاریخ", "ورود/خروج", "ساعت", "مختصات", "مدت (ساعت)"])
 
-    grouped = defaultdict(list)
+        grouped = defaultdict(list)
     for r in records:
         key = (r[0], r[4][:10])  # (نام, تاریخ)
         grouped[key].append(r)
