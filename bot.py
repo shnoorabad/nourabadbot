@@ -21,7 +21,7 @@ from pytz import timezone
 iran = timezone("Asia/Tehran")
 import os
 BOT_TOKEN = os.environ["BOT_TOKEN"]
-ADMIN_CHAT_IDS = [123902504, 78494533]  # شناسه تلگرام مدیرها
+ADMIN_CHAT_IDS = [123902504]  # شناسه تلگرام مدیرها
 DB_FILE = "attendance.db"
 FONT_PATH = "./fonts/Vazir.ttf"
 PDF_REPORT = "attendance_report.pdf"
