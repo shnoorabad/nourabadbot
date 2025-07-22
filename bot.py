@@ -207,7 +207,7 @@ async def ask_leave_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [[KeyboardButton("ثبت حضور", request_location=True)], [KeyboardButton("درخواست مرخصی")]]
         if update.effective_user.id in ADMIN_CHAT_IDS:
            keyboard.append([KeyboardButton("گزارش‌گیری")])
-        await update.message.reply_text("یکی از گزینه‌ها را انتخاب کنید:", reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
+        #await update.message.reply_text("یکی از گزینه‌ها را انتخاب کنید:", reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
         return ConversationHandler.END
     else:
         await update.message.reply_text("ساعت شروع و پایان را وارد کنید (مثلاً 09 تا 12):")
