@@ -234,7 +234,7 @@ async def ask_leave_hours(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[KeyboardButton("ثبت حضور", request_location=True)], [KeyboardButton("درخواست مرخصی")]]
     if update.effective_user.id in ADMIN_CHAT_IDS:
        keyboard.append([KeyboardButton("گزارش‌گیری")])
-    await update.message.reply_text("یکی از گزینه‌ها را انتخاب کنید:", reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
+    # await update.message.reply_text("یکی از گزینه‌ها را انتخاب کنید:", reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
     return ConversationHandler.END
 async def handle_approval(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
