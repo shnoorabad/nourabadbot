@@ -128,20 +128,27 @@ async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     location = update.message.location
 
-    # بررسی اینکه آیا قبل از ارسال لوکیشن، دکمه‌ای برای ثبت ورود/خروج زده شده
-    if "last_action" not in context.user_data:
-        await update.message.reply_text("لطفاً ابتدا دکمه «ثبت ورود/خروج» را بزنید.")
+    # ✅ فقط اگر کاربر قبلاً دکمه «ثبت حضور» را زده باشد
+    if not context.user_data.get("ready_for_attendance"):
+        await update.message.reply_text("لطفاً ابتدا دکمه «ثبت حضور» را بزنید.")
         return
 
-    action = context.user_data.pop("last_action")  # حذف پس از استفاده
+    # ✅ حالا چرخشی تصمیم بگیر: ورود یا خروج
+    action = get_next_action(user.id)
 
+    # ✅ علامت را پاک کن تا لوکیشن بعدی ثبت نشود مگر دکمه را دوباره بزند
+    context.user_data.pop("ready_for_attendance")
+
+    # ذخیره در دیتابیس
     save_attendance(user.id, user.full_name, action, location.latitude, location.longitude)
-    await update.message.reply_text(f"{action} شما با موفقیت ثبت شد.")
+    await update.message.reply_text(f"{action} شما با موفقیت ثبت شد.") 
 
     for admin_id in ADMIN_CHAT_IDS:
         await context.bot.send_message(
             chat_id=admin_id,
-            text=f"{user.full_name} — {action}"
+            text=f"{user.full_name} – {action}\n"
+                 f"موقعیت: https://maps.google.com/?q={location.latitude},{location.longitude}\n"
+                 f"زمان: {datetime.now(iran).strftime('%Y-%m-%d %H:%M:%S')}"
         )
         await context.bot.send_location(
             chat_id=admin_id,
