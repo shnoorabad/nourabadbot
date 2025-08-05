@@ -127,15 +127,25 @@ def upload_to_drive():
 async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     location = update.message.location
+    now = datetime.now(iran)
+
+    last_click = context.user_data.get("last_button_click")
+    if not last_click or (now - last_click > timedelta(seconds=10)):
+        await update.message.reply_text("لطفاً ابتدا دکمه «ثبت حضور» را بزنید.")
+        return
+
+    context.user_data.pop("last_button_click")
+
     action = get_next_action(user.id)
-
     save_attendance(user.id, user.full_name, action, location.latitude, location.longitude)
-    await update.message.reply_text(f"{action} شما ثبت شد.") 
-
+    await update.message.reply_text(f"{action} شما با موفقیت ثبت شد.")
+    
     for admin_id in ADMIN_CHAT_IDS:
         await context.bot.send_message(
             chat_id=admin_id,
-            text=f"{user.full_name} – {action}\nموقعیت: https://maps.google.com/?q={location.latitude},{location.longitude}\nزمان: {datetime.now(iran).strftime('%Y-%m-%d %H:%M:%S')}"
+            text=f"{user.full_name} – {action}\n"
+                 f"موقعیت: https://maps.google.com/?q={location.latitude},{location.longitude}\n"
+                 f"زمان: {now.strftime('%Y-%m-%d %H:%M:%S')}"
         )
         await context.bot.send_location(
             chat_id=admin_id,
@@ -484,7 +494,12 @@ def download_from_drive(filename):
     with open(filename, "wb") as f:
         f.write(request.execute())
     print("فایل attendance1404.db با موفقیت دانلود شد.")
+# اضافه کن اینجا 👇 (حدود خط 485)
+from datetime import datetime, timedelta
 
+async def handle_text_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.text == "ثبت حضور":
+        context.user_data["last_button_click"] = datetime.now(iran)
 def main():
     try:
         download_from_drive(DB_FILE)
@@ -517,7 +532,7 @@ def main():
         },
         fallbacks=[]
     ))
-
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_button))
     app.run_polling()
 
 if __name__ == "__main__":
