@@ -127,15 +127,21 @@ def upload_to_drive():
 async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     location = update.message.location
-    action = get_next_action(user.id)
+
+    # بررسی اینکه آیا قبل از ارسال لوکیشن، دکمه‌ای برای ثبت ورود/خروج زده شده
+    if "last_action" not in context.user_data:
+        await update.message.reply_text("لطفاً ابتدا دکمه «ثبت ورود/خروج» را بزنید.")
+        return
+
+    action = context.user_data.pop("last_action")  # حذف پس از استفاده
 
     save_attendance(user.id, user.full_name, action, location.latitude, location.longitude)
-    await update.message.reply_text(f"{action} شما ثبت شد.") 
+    await update.message.reply_text(f"{action} شما با موفقیت ثبت شد.")
 
     for admin_id in ADMIN_CHAT_IDS:
         await context.bot.send_message(
             chat_id=admin_id,
-            text=f"{user.full_name} – {action}\nموقعیت: https://maps.google.com/?q={location.latitude},{location.longitude}\nزمان: {datetime.now(iran).strftime('%Y-%m-%d %H:%M:%S')}"
+            text=f"{user.full_name} — {action}"
         )
         await context.bot.send_location(
             chat_id=admin_id,
